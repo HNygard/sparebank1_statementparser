@@ -206,7 +206,7 @@ class sparebank1_statementparser_core
 						'intrest_date'    => $intrest_date,
 						'amount'          => ($amount/100),
 						'payment_date'    => $payment_date,
-						'type_pdf'        => self::$lasttransactions_type,
+						'type'            => self::$lasttransactions_type,
 					);
 				/*
 				echo '<tr>';
@@ -386,5 +386,30 @@ class sparebank1_statementparser_core
 	public function getAccounts()
 	{
 		return $this->accounts;
+	}
+	
+	/**
+	 * Returns transactions from given account in CSV format
+	 *
+	 * @param   array   Account with transactions
+	 * @return  string  CSV
+	 */
+	public static function getCSV($account)
+	{
+		if(!isset($account['transactions']))
+			throw new Kohana_Exception('CSV exporter failed. Given account has no transaction variable');
+		
+		$csv = 'Date;Description;Amount'.chr(10);
+		foreach($account['transactions'] as $transaction)
+		{
+			$type = '';
+			if($transaction['type'] != '')
+				$type = $transaction['type'];
+			$csv .= 
+				date('d.m.Y', $transaction['payment_date']).';'.
+				'"'.$transaction['description'].'";'.
+				$transaction['amount'].chr(10);
+		}
+		return trim($csv);
 	}
 }
