@@ -8,10 +8,12 @@ class sparebank1_statementparser_core
 	protected $transactions_not_imported = 0;
 	protected $transactions_already_imported = 0;
 	
+	protected $imported = false;
+	
 	/**
 	 * Imports the PDF file from a string to internal variables
 	 *
-	 * @param   String                           @file_get_contents('filename', FILE_BINARY)
+	 * @param   String                           file_get_contents('filename', FILE_BINARY)
 	 * @return  Sparebank1_statementparser_core  Returns 
 	 */
 	function importPDF ($infile)
@@ -368,6 +370,9 @@ class sparebank1_statementparser_core
 					));
 		}
 		
+		// Great success!
+		$this->imported = true;
+		
 		return $this;
 	}
 	
@@ -383,9 +388,22 @@ class sparebank1_statementparser_core
 		return $description;
 	}
 	
+	/**
+	 * Returns array with accounts found in the file
+	 *
+	 * @return  array
+	 */
 	public function getAccounts()
 	{
+		$this->isImportedOrThrowException();
+		
 		return $this->accounts;
+	}
+	
+	public function isImportedOrThrowException ()
+	{
+		if(!$this->imported)
+			throw new Kohana_Exception('PDF file is not imported');
 	}
 	
 	/**
