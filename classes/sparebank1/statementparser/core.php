@@ -86,16 +86,16 @@ class sparebank1_statementparser_core
 				preg_match('/Kontoutskrift nr. (.*) for konto (.*) i perioden (.*) - (.*)/', $td[0], $parts);
 				if(count($parts) == 5)
 				{
-					$accountoverview_num    = $parts[1]; // 2
-					$account_num            = $parts[2]; // 1234.12.12345
-					$accountoverview_start  = sb1helper::convert_stringDate_to_intUnixtime
+					$accountstatement_num    = $parts[1]; // 2
+					$account_num             = $parts[2]; // 1234.12.12345
+					$accountstatement_start  = sb1helper::convert_stringDate_to_intUnixtime
 					                        ($parts[3]); // 01.02.2011
 					$parts  = explode(' ',$parts[4], 2); // 28.02.2011 Alltid Pluss 18-34
-					$accountoverview_end    = sb1helper::convert_stringDate_to_intUnixtime 
-					                        ($parts[0]); // 28.02.2011
-					$account_type           = $parts[1]; // Alltid Pluss 18-34
+					$accountstatement_end    = sb1helper::convert_stringDate_to_intUnixtime 
+					                         ($parts[0]); // 28.02.2011
+					$account_type            = $parts[1]; // Alltid Pluss 18-34
 					
-					$last_account = $account_num.'_'.$accountoverview_start;
+					$last_account = $account_num.'_'.$accountstatement_start;
 					$tmp = Sprig::factory('bankaccount', array('num' => $account_num))->load();
 					if(!$tmp->loaded())
 						$last_account_id = -1;
@@ -106,14 +106,14 @@ class sparebank1_statementparser_core
 					if(!isset($this->accounts[$last_account]))
 					{
 						$this->accounts[$last_account] = array(
-							'accountoverview_num'    => $accountoverview_num,
-							'account_id'             => $last_account_id,
-							'account_num'            => $account_num,
-							'accountoverview_start'  => $accountoverview_start,
-							'accountoverview_end'    => $accountoverview_end,
-							'account_type'           => $account_type,
-							'transactions'           => array(),
-							'control_amount'         => 0,
+							'accountstatement_num'    => $accountstatement_num,
+							'account_id'              => $last_account_id,
+							'account_num'             => $account_num,
+							'accountstatement_start'  => $accountstatement_start,
+							'accountstatement_end'    => $accountstatement_end,
+							'account_type'            => $account_type,
+							'transactions'            => array(),
+							'control_amount'          => 0,
 						);
 						//echo '<tr><td>Account: <b>'.$account_num.'</b></td></tr>';
 					}
@@ -164,9 +164,9 @@ class sparebank1_statementparser_core
 				}
 				
 				$intrest_date = sb1helper::convert_stringDate_to_intUnixtime 
-					($td[1], date('Y', $this->accounts[$last_account]['accountoverview_end']));
+					($td[1], date('Y', $this->accounts[$last_account]['accountstatement_end']));
 				$payment_date = sb1helper::convert_stringDate_to_intUnixtime 
-					($td[3], date('Y', $this->accounts[$last_account]['accountoverview_end']));
+					($td[3], date('Y', $this->accounts[$last_account]['accountstatement_end']));
 				
 				// Checking description for transaction type 
 				// If found, add to type_pdf and match format for CSV
@@ -258,13 +258,13 @@ class sparebank1_statementparser_core
 				$next_is_balance_in = true;
 			}
 			elseif(
-				// Balance in on this account overview
+				// Balance in on this account statement
 				$next_is_balance_in
 			)
 			{
-				$this->accounts[$last_account]['accountoverview_balance_in'] = 
+				$this->accounts[$last_account]['accountstatement_balance_in'] = 
 					sb1helper::stringKroner_to_intOerer ($td[0]);
-				$this->accounts[$last_account]['control_amount'] += $this->accounts[$last_account]['accountoverview_balance_in'];
+				$this->accounts[$last_account]['control_amount'] += $this->accounts[$last_account]['accountstatement_balance_in'];
 				$next_is_balance_in = false;
 			}
 			
@@ -309,11 +309,11 @@ class sparebank1_statementparser_core
 				$next_is_transactions  = false;
 			}
 			elseif(
-				// Balance out on this account overview
+				// Balance out on this account statement
 				$next_is_balance_out
 			)
 			{
-				$this->accounts[$last_account]['accountoverview_balance_out'] =
+				$this->accounts[$last_account]['accountstatement_balance_out'] =
 					sb1helper::stringKroner_to_intOerer ($td[0]);
 				$next_is_balance_out = false;
 			}
@@ -328,7 +328,7 @@ class sparebank1_statementparser_core
 			
 			
 			/*
-			elseif($last_account && $this->accounts[$last_account]['accountoverview_num'] == '9')
+			elseif($last_account && $this->accounts[$last_account]['accountstatement_num'] == '9')
 			{
 				// Debugging
 				echo '<tr><td colspan="4">'.print_r($td, true).'</td></tr>';
@@ -347,24 +347,24 @@ class sparebank1_statementparser_core
 		foreach($this->accounts as $account)
 		{
 			// Checking if all parameters have been found
-			if(!isset($account['accountoverview_balance_in']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountoverview_balance_in.');
-			if(!isset($account['accountoverview_balance_out']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountoverview_balance_out.');
-			if(!isset($account['accountoverview_start']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountoverview_start.');
-			if(!isset($account['accountoverview_end']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountoverview_end.');
+			if(!isset($account['accountstatement_balance_in']))
+				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_balance_in.');
+			if(!isset($account['accountstatement_balance_out']))
+				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_balance_out.');
+			if(!isset($account['accountstatement_start']))
+				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_start.');
+			if(!isset($account['accountstatement_end']))
+				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_end.');
 			
-			// Checking if the found amount is the same as the control amount found on accountoverview
+			// Checking if the found amount is the same as the control amount found on accountstatement
 			// If not, the file is corrupt or parser has made a mistake
-			if(round($account['control_amount'],2) != $account['accountoverview_balance_out'])
+			if(round($account['control_amount'],2) != $account['accountstatement_balance_out'])
 				throw new Kohana_Exception('PDF parser failed. Controlamount is not correct. '.
 					'Controlamount, calculated: :control_amount. '.
-					'Balance out should be: :accountoverview_balance_out.', 
+					'Balance out should be: :accountstatement_balance_out.', 
 					array(
-						':control_amount'               => $account['control_amount'],
-						':accountoverview_balance_out'  => $account['accountoverview_balance_out'],
+						':control_amount'                => $account['control_amount'],
+						':accountstatement_balance_out'  => $account['accountstatement_balance_out'],
 					));
 		}
 		
