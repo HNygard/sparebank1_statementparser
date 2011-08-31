@@ -186,6 +186,16 @@ class sparebank1_statementparser_core
 					($description, 'Overføring ', 'OVERFØRSEL'); // Overføring => Overførsel:
 				$description = self::remove_firstpart_if_found_and_set_type_pdf
 					($description, 'Valuta ', 'VALUTA'); // Valuta => VALUTA:
+				$description = self::remove_firstpart_if_found_and_set_type_pdf
+					($description, 'Nettbank til:', 'NETTBANK TIL'); // Nettbank til: => NETTBANK TIL
+				$description = self::remove_firstpart_if_found_and_set_type_pdf
+					($description, 'Nettbank fra:', 'NETTBANK FRA'); // Nettbank til: => NETTBANK FRA
+				$description = self::remove_firstpart_if_found_and_set_type_pdf
+					($description, 'Nettgiro til:', 'NETTGIRO TIL'); // Nettgiro til: => NETTGIRO TIL
+				$description = self::remove_firstpart_if_found_and_set_type_pdf
+					($description, 'Nettgiro fra:', 'NETTGIRO FRA'); // Nettgiro fra: => NETTGIRO FRA
+				$description = self::remove_firstpart_if_found_and_set_type_pdf
+					($description, 'Telegiro fra:', 'TELEGIRO FRA'); // Telegiro fra: => TELEGIRO FRA
 				if(substr($description, 0, 1) == '*' && is_numeric(substr($description, 1, 4))) // *1234 = VISA VARE
 				{
 				}
@@ -199,6 +209,42 @@ class sparebank1_statementparser_core
 				if(self::$lasttransactions_type == 'VARER')
 				{
 					$description  = trim(substr($description, 5));
+				}
+				
+				if(
+					self::$lasttransactions_type == 'NETTBANK TIL' ||
+					self::$lasttransactions_type == 'NETTBANK FRA' ||
+					self::$lasttransactions_type == 'NETTGIRO TIL' ||
+					self::$lasttransactions_type == 'NETTGIRO FRA' ||
+					self::$lasttransactions_type == 'TELEGIRO FRA'
+				) {
+					// Nettbank til: Some Name Betalt: DD.MM.YY
+					// Nettbank fra: Some Name Betalt: 31.12.99
+					// Nettgiro til: 1234.56.78901 Betalt: 01.01.11
+					// Nettgiro fra: Some Name Betalt: 01.01.11
+					// Telegiro fra: Some Name Betalt: 01.01.11
+					//
+					// Format:
+					// TYPE: TEXT Betalt: 15.10.09
+					//
+					// Nettbank til/Nettbank fra/Nettgiro til are already chopped of
+					
+					// :? Search for "Betalt: " in the text
+					$betalt_pos = strpos($description, 'Betalt: ');
+					if($betalt_pos !== false)
+					{
+						// -> Found "Betalt: "
+						$date_tmp = substr(
+								$description, 
+								$betalt_pos+strlen('Betalt: ')
+							);
+						if(substr($date_tmp, 6) >= 90) // year 1990-1999
+							$date_tmp = substr($date_tmp, 0, 6).'19'.substr($date_tmp, 6);
+						else // year 2000-2099
+							$date_tmp = substr($date_tmp, 0, 6).'20'.substr($date_tmp, 6);
+						$transaction['payment_date']  = sb1helper::convert_stringDate_to_intUnixtime($date_tmp);
+						$description                  = trim(substr($description, 0, $betalt_pos));
+					}
 				}
 				
 				$this->accounts[$last_account]['control_amount'] += $amount;
