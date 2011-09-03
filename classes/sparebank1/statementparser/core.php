@@ -58,7 +58,7 @@ class sparebank1_statementparser_core
 						is_numeric($td[5]) // 123321123
 					)
 				) &&
-				is_numeric($td[2]) && strlen($td[2]) == 4 && // ddmm, intrest_date
+				is_numeric($td[2]) && strlen($td[2]) == 4 && // ddmm, interest_date
 				is_numeric(
 					str_replace(',', '.',
 					str_replace(' ', '',
@@ -140,7 +140,7 @@ class sparebank1_statementparser_core
 						is_numeric($td[4]) // 123321123
 					)
 				) &&
-				is_numeric($td[1]) && strlen($td[1]) == 4 && // ddmm, intrest_date
+				is_numeric($td[1]) && strlen($td[1]) == 4 && // ddmm, interest_date
 				is_numeric(
 					str_replace(',', '.',
 					str_replace(' ', '',
@@ -165,7 +165,7 @@ class sparebank1_statementparser_core
 					$amount = -$amount;
 				}
 				
-				$intrest_date = sb1helper::convert_stringDate_to_intUnixtime 
+				$interest_date = sb1helper::convert_stringDate_to_intUnixtime 
 					($td[1], date('Y', $this->accounts[$last_account]['accountstatement_end']));
 				$payment_date = sb1helper::convert_stringDate_to_intUnixtime 
 					($td[3], date('Y', $this->accounts[$last_account]['accountstatement_end']));
@@ -251,7 +251,7 @@ class sparebank1_statementparser_core
 				$this->accounts[$last_account]['transactions'][] = array(
 						'bankaccount_id'  => $last_account_id,
 						'description'     => $description,
-						'intrest_date'    => $intrest_date,
+						'interest_date'   => $interest_date,
 						'amount'          => ($amount/100),
 						'payment_date'    => $payment_date,
 						'type'            => self::$lasttransactions_type,
@@ -259,7 +259,7 @@ class sparebank1_statementparser_core
 				/*
 				echo '<tr>';
 				echo '<td>'.$description.'</td>';
-				echo '<td>'.date('d.m.Y', $intrest_date).'</td>';
+				echo '<td>'.date('d.m.Y', $interest_date).'</td>';
 				if($amount > 0)
 					echo '<td>&nbsp;</td><td>'.($amount/100).'</td>';
 				else
@@ -271,7 +271,7 @@ class sparebank1_statementparser_core
 				$this->transactions[] = array(
 						'bankaccount_id' => $this->bankaccount_id,
 						'payment_date'   => utf8::clean($csv[0]),
-						'intrest_date'   => utf8::clean($csv[2]),
+						'interest_date'  => utf8::clean($csv[2]),
 						'description'    => utf8_encode($csv[1]),
 						'amount'         => str_replace(',', '.', utf8::clean($csv[3])),
 					);*/
