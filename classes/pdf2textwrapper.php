@@ -152,8 +152,13 @@ static function getDecodedStream($stream, $options) {
                 $_stream = pdf2textwrapper::decodeAsciiHex($_stream);
             if ($key == "ASCII85Decode" || $key == 'A85') // A85 added by Hallvard Nygard
                 $_stream = pdf2textwrapper::decodeAscii85($_stream);
-            if ($key == "FlateDecode" || $key == 'Fl') // Fl added by Hallvard Nygard
+            
+            // ?: Is the filter FlateDecode?
+            if ($key == "FlateDecode" || $key == 'Fl' || $key == 'FlateDecode]') {
+		// Fl & "FlateDecode]" added by Hallvard Nygard
+                // Added "FlateDecode]" since I don't want to fix the reg ex
                 $_stream = pdf2textwrapper::decodeFlate($_stream);
+            }
         }
         $data = $_stream;
     }
