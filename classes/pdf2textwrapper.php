@@ -353,6 +353,10 @@ static function pdf2text_fromstring($infile)
 
 			$data = pdf2textwrapper::getDecodedStream($stream, $options);
 			if (strlen($data)) {
+				
+				// Remove \r from data. This could be fixed in the reg ex below
+				$data = str_replace("\r", '', $data);
+				
 				if (preg_match_all("#BT\n(.*)ET\n#ismU", $data, $textContainers)) {
 					$textContainers = @$textContainers[1];
 					pdf2textwrapper::getDirtyTexts($texts, $textContainers);
