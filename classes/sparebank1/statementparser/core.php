@@ -310,8 +310,31 @@ class sparebank1_statementparser_core
 				$next_is_balance_in
 			)
 			{
-				$this->accounts[$last_account]['accountstatement_balance_in'] = 
-					sb1helper::stringKroner_to_intOerer ($td[0]);
+				/*
+					Observed values for $pos_amount:
+					- 2135, 1 digits positive
+					- 2116, 2 digits positive
+					- 2097, 3 digits positive
+					- 2068, 4 digits positive
+					- 2049, 5 digits positive
+					- 2030, 6 digits positive
+					
+					- 1688, 3 digits positive
+					- 1659, 4 digits positive
+					- 1640, 5 digits positive
+					
+					- 1854, 1 digits negative
+					
+					Using from 1850 to 1950 as negative
+				 */
+				$balance_in = sb1helper::stringKroner_to_intOerer ($td[0]);
+				$pos_amount = pdf2textwrapper::$table_pos[$td_id][1][0];
+				
+				if($pos_amount >= 1850 && $pos_amount <= 1950)
+				{
+					$balance_in = -$balance_in;
+				}
+				$this->accounts[$last_account]['accountstatement_balance_in'] = $balance_in;
 				$this->accounts[$last_account]['control_amount'] += $this->accounts[$last_account]['accountstatement_balance_in'];
 				$next_is_balance_in = false;
 			}
@@ -353,16 +376,32 @@ class sparebank1_statementparser_core
 				(count($td) == 16 && implode($td) == 'SaldoiDeresfavør') // Bokmål
 			)
 			{
-				$next_is_balance_out   = true;
-				$next_is_transactions  = false;
+				// -> Balance out is positive
+				$next_is_balance_out     = true;
+				$next_is_transactions    = false;
+				$balance_out_is_positive = true;
+			}
+			elseif(
+				// Saldo i vår favør
+				(count($td) == 14 && implode($td) == 'Saldoivårfavør')
+			)
+			{
+				// -> Balance out is negative
+				$next_is_balance_out     = true;
+				$next_is_transactions    = false;
+				$balance_out_is_positive = false;
 			}
 			elseif(
 				// Balance out on this account statement
 				$next_is_balance_out
 			)
 			{
-				$this->accounts[$last_account]['accountstatement_balance_out'] =
-					sb1helper::stringKroner_to_intOerer ($td[0]);
+				$balance_out = sb1helper::stringKroner_to_intOerer ($td[0]);
+				if(!$balance_out_is_positive) {
+					// -> Negative balance
+					$balance_out = -$balance_out;
+				}
+				$this->accounts[$last_account]['accountstatement_balance_out'] = $balance_out;
 				$next_is_balance_out = false;
 			}
 			elseif(
