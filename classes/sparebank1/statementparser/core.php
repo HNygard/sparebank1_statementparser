@@ -444,36 +444,337 @@ class sparebank1_statementparser_core
 			}
 			/**/
 		}
-		
-		// Checking if the PDF is successfully parsed
-		foreach($this->accounts as $account)
-		{
-			// Checking if all parameters have been found
-			if(!isset($account['accountstatement_balance_in']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_balance_in.');
-			if(!isset($account['accountstatement_balance_out']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_balance_out.');
-			if(!isset($account['accountstatement_start']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_start.');
-			if(!isset($account['accountstatement_end']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_end.');
-			
-			// Checking if the found amount is the same as the control amount found on accountstatement
-			// If not, the file is corrupt or parser has made a mistake
-			if(round($account['control_amount'],2) != $account['accountstatement_balance_out'])
-				throw new Kohana_Exception('PDF parser failed. Controlamount is not correct. '.
-					'Controlamount, calculated: :control_amount. '.
-					'Balance out should be: :accountstatement_balance_out.', 
-					array(
-						':control_amount'                => $account['control_amount'],
-						':accountstatement_balance_out'  => $account['accountstatement_balance_out'],
-					));
+	}
+	
+	private function parseAndReadJan2008Pdf() {
+
+		if(!count(pdf2textwrapper::$table)) {
+			/*
+			// Add:
+			//    if(self::$debugging) { echo '<pre>'.$data.'</pre>'; }
+			// or something in pdf2textwrapper to debug the current PDF (a failed PDF)
+			pdf2textwrapper::$debugging = true;
+			pdf2textwrapper::pdf2text_fromstring($infile);
+			pdf2textwrapper::$debugging = false;
+			/**/
+
+			throw new Kohana_Exception('PDF parser failed. Unable to read any lines.');
 		}
 		
-		// Great success!
-		$this->imported = true;
+		$next_is_balance_in   = false;
+		$next_is_balance_out  = false;
+		$next_is_fee          = false;
+		$next_is_transactions = false;
+		$next_is_heading_part_two    = false;
+		$next_is_heading_part_three  = false;
 		
-		return $this;
+		$last_account = null;
+
+		$table = array(); $table_width = array();
+		$last_height = -1;
+		foreach(pdf2textwrapper::$table as $td_id => $td)
+		{
+			/*
+			// Debugging
+			echo '<tr><td colspan="4">'.implode('', $td).'</td></tr>';
+			echo '<tr><td colspan="4" style="color: gray;">'.print_r($td, true).'</td></tr>';
+			/**/
+			
+			if($td[0] == 'Kontoutskrift' && $td[1] == 'nr.') {
+				/*
+					THIS LINE ($td)
+						[0] => Kontoutskrift 
+						[1] => nr. 
+						[2] => 8 
+						[3] => for 
+						[4] => konto 
+						[5] => 1234.56.12345 
+						[6] => i 
+						[7] => perioden 
+						[8] => 01.08.2006 )
+					NEXT LINE ($table[$td_id+1])
+						[0] => 31.08.2006 
+						[1] => Name 
+						[2] => Of 
+						[3] => Accounttype
+						[4] => IBAN: 
+						[5] => NO65 
+						[6] => 1234 
+						[7] => 5612 
+						[8] => 345 
+						[9] => BIC )
+					
+					OR if there is not IBAN number:
+						[0] => Kontoutskrift 
+						[1] => nr. 
+						[2] => 1 
+						[3] => for 
+						[4] => konto 
+						[5] => 1234.12.12345 
+						[6] => i 
+						[7] => perioden 
+						[8] => 01.01.2002-31.12.2002 
+						[9] => Name 
+						[10] => Of 
+						[11] => Accounttype
+					
+					OR this array:
+						variant of the first...
+				*/
+				
+				$this_line = implode($td, ' ');
+				$next_line = implode(pdf2textwrapper::$table[$td_id+1], ' ');
+				
+				preg_match('/Kontoutskrift nr. (.*) for konto (.*) i perioden (.*) - (.*) IBAN(.*)/', 
+					$this_line.' - '.$next_line, $parts1);
+				preg_match('/Kontoutskrift nr. (.*) for konto (.*) i perioden (.*)-(.*)/', 
+					$this_line, $parts2);
+				preg_match('/Kontoutskrift nr. (.*) for konto (.*) i perioden (.*) - (.*)/', 
+					$this_line.' - '.$next_line, $parts3);
+				$found = false;
+				if(count($parts1) == 6) {
+					$parts = $parts1;
+					$found = true;
+				}
+				elseif(count($parts2) == 5) {
+					$parts = $parts2;
+					$found = true;
+				}
+				elseif(count($parts3) == 5) {
+					$parts = $parts3;
+					$found = true;
+				}
+				else {
+					/*
+					// Debugging:
+					echo '<tr><td colspan="4"><b>Part 1</b> <pre>'.print_r($parts1, true).'</pre></td></tr>';
+					echo '<tr><td colspan="4"><b>Part 2</b> <pre>'.print_r($parts2, true).'</pre></td></tr>';
+					echo '<tr><td colspan="4"><b>Part 3</b> <pre>'.print_r($parts3, true).'</pre></td></tr>';
+					/**/
+					throw new Kohana_Exception('Not able to retrive account info.');
+				}
+				
+				if($found)
+				{
+					$accountstatement_num    = $parts[1]; // 2
+					$account_num             = $parts[2]; // 1234.12.12345
+					$accountstatement_start  = sb1helper::convert_stringDate_to_intUnixtime
+					                        ($parts[3]); // 01.02.2011
+					$parts  = explode(' ',$parts[4], 2); // 28.02.2011 Alltid Pluss 18-34
+					$accountstatement_end    = sb1helper::convert_stringDate_to_intUnixtime 
+					                         ($parts[0]); // 28.02.2011
+					$account_type            = $parts[1]; // Alltid Pluss 18-34
+					
+					$last_account = $account_num.'_'.$accountstatement_start;
+					$tmp = Sprig::factory('bankaccount', array('num' => $account_num))->load();
+					if(!$tmp->loaded())
+						$last_account_id = -1;
+					else
+						$last_account_id = $tmp->id;
+					
+					// If account spans over several pages, the heading repeats
+					if(!isset($this->accounts[$last_account]))
+					{
+						$this->accounts[$last_account] = array(
+							'accountstatement_num'    => $accountstatement_num,
+							'account_id'              => $last_account_id,
+							'account_num'             => $account_num,
+							'accountstatement_start'  => $accountstatement_start,
+							'accountstatement_end'    => $accountstatement_end,
+							'account_type'            => $account_type,
+							'transactions'            => array(),
+							'control_amount'          => 0,
+						);
+						//echo '<tr><td>Account: <b>'.$account_num.'</b></td></tr>';
+					}
+					$next_is_fee               = false;
+				}
+			}
+			
+			// Saldo i Dykkar favør, nynorsk
+			// Saldo i Deres favør, bokmål
+			elseif (substr(implode($td),0,strlen('SaldoiD')) == 'SaldoiD') {
+
+				/*
+					Possible variants:
+						[0] => Saldo 
+						[1] => i 
+						[2] => Dykkar 
+						[3] => favør 
+						[4] => 1.234,56
+					OR:
+						[0] => Saldo 
+						[1] => i 
+						[2] => Dykkar 
+						[3] => favør 
+						[4] => 123,45 
+						[5] => Stadfesta 
+						[6] => beløp 
+						[7] => 123,45
+				*/
+				$next_is_transactions        = false;
+
+				$balance_out_is_positive = true; // TODO
+				
+				// Balance out is the 4th element
+				$balance_out = sb1helper::stringKroner_to_intOerer ($td[4]);
+				if(!$balance_out_is_positive) {
+					// -> Negative balance
+					$balance_out = -$balance_out;
+				}
+				$this->accounts[$last_account]['accountstatement_balance_out'] = $balance_out;
+
+				//echo '<tr><td colspan="4"><b>BALANCE OUT</b> '.($balance_out/100).'</td></tr>';
+				
+				
+				// :: Parse the transations we have collected
+				//
+				// - The thrid last  cell per line is the interest date
+				// - The second last cell per line is the amount
+				// - The last        cell per line is the payment date
+				// Except the first line, which is balance from last bank statement
+				foreach($table as $key => $value) {
+					// The rows in this table might be:
+					// - Balance in
+					// - Heading be for fee (the next transations are fees)
+					// - Ignore "Overført frå forrige side"
+					// - Transactions
+					
+					if(substr(implode($value),0,strlen('Saldofr')) == 'Saldofr') {
+						
+						$balance_in_is_positive = true; // TODO
+						
+						$balance_in = sb1helper::stringKroner_to_intOerer ($value[count($value)-1]);
+						if(!$balance_in_is_positive) {
+							// -> Negative balance
+							$balance_in = -$balance_in;
+						}
+						$this->accounts[$last_account]['accountstatement_balance_in'] = $balance_in;
+						$this->accounts[$last_account]['control_amount'] 
+							+= $this->accounts[$last_account]['accountstatement_balance_in'];
+					}
+					
+					elseif(substr(implode($value),0,strlen('Kostnadervedbrukavbanktenester:')) 
+						== 'Kostnadervedbrukavbanktenester:') {
+						$next_is_fee = true;
+					}
+					
+					// ?: "Overført frå forrige side"?
+					elseif(preg_match('/Overf.rtfr.forrigeside/', implode($value))) {
+						// Ignore, not a transaction
+					}
+					
+					else {
+						// -> Transactions
+							
+						$key_payment_date   = count($value)-1;
+						$key_amount         = count($value)-2;
+						$key_interest_date  = count($value)-3;
+						
+						$payment_date   = $value[$key_payment_date];
+						$amount         = $value[$key_amount];
+						$interest_date  = $value[$key_interest_date];
+						
+						unset($value[$key_payment_date]);
+						unset($value[$key_amount]);
+						unset($value[$key_interest_date]);
+						
+						$amount = sb1helper::stringKroner_to_intOerer($amount);
+						$pos_amount  = $table_width[$key][$key_amount];
+						/*
+							Observed values for $pos_amount:
+							486.7, 3 digits positive
+							474.2, 4 digits positive
+							416.9, 2 digits positive
+							421.9, 2 digits negative
+							411.8, 3 digits negative
+							404.4, 4 digits negative
+						 */
+						if($pos_amount < 422) {
+							$amount = -$amount;
+						}
+						
+						/*
+						// Debugging
+						echo
+							'<tr>'.
+								'<td style="width: 100px;">'.$payment_date.'</td>'.
+								'<td style="width: 100px;">'.($amount/100).'</td>'.
+								'<td style="width: 100px;">'.$interest_date.'</td>'.
+								'<td>'.$pos_amount .' '.implode(' ',$value).'</td>'.
+							'</tr>';
+						/**/
+
+						self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime 
+							($interest_date, date('Y', $this->accounts[$last_account]['accountstatement_end']));
+						self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime 
+							($payment_date, date('Y', $this->accounts[$last_account]['accountstatement_end']));
+				
+						self::$lasttransactions_description  = implode(' ', $value);
+						self::$lasttransactions_type         = '';
+				
+						self::parseLastDescription($next_is_fee);
+				
+						$this->accounts[$last_account]['control_amount'] += $amount;
+						$this->accounts[$last_account]['transactions'][] = array(
+								'bankaccount_id'  => $last_account_id,
+								'description'     => self::$lasttransactions_description,
+								'interest_date'   => self::$lasttransactions_interest_date,
+								'amount'          => ($amount/100),
+								'payment_date'    => self::$lasttransactions_payment_date,
+								'type'            => self::$lasttransactions_type,
+							);
+					}
+				}
+			}
+			
+			elseif (substr(implode($td),0,strlen('ForklaringRentedatoUtavkontoInn')) == 'ForklaringRentedatoUtavkontoInn') {
+				$next_is_transactions        = true;
+			}
+			
+			elseif (preg_match('/Dato[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9][0-9][0-9]Sidenr/', implode($td))) {
+				//echo '<tr><td colspan="4"><b>NEW PAGE</b></td></tr>';
+				$next_is_transactions = false; // Don't start parsing transactions until the heading has been parsed
+				$last_height          = -1;    // Start the count again
+			}
+			
+			elseif ($next_is_transactions) {
+				// All transactions are on one line in this format
+				
+				// Parse this line based on height in PDF
+				// Transactions can be multi line in the description field
+				foreach($td as $key => $value) {
+					$position_width  = pdf2textwrapper::$table_pos[$td_id][1][$key];
+					$position_height = pdf2textwrapper::$table_pos[$td_id][2][$key];
+					
+					//echo '<tr><td colspan="4">PARSE TRANSACTION: '.$position_width .' - '.$position_height.': '.$value.'</td></tr>';
+					
+					if(!isset($table[$position_height])) {
+						$table      [$position_height] = array();
+						$table_width[$position_height] = array();
+					}
+					
+					if($last_height != -1 && $last_height < $position_height) {
+						// -> The last line was a part of this line
+						
+						// Merge the last into this line
+						$table      [$position_height] = 
+							array_merge($table[$position_height], $table[$last_height]);
+						$table_width[$position_height] = 
+							array_merge($table_width[$position_height], $table_width[$last_height]);
+						
+						// Unset the partial line
+						unset($table      [$last_height]);
+						unset($table_width[$last_height]);
+					}
+					
+					$table      [$position_height][] = $value;
+					$table_width[$position_height][] = $position_width;
+					
+					$last_height = $position_height;
+				}
+			}
+		}
 	}
 	
 	static function parseLastDescription ($is_fee) {
