@@ -15,6 +15,10 @@ class pdf2textwrapper
 	public static $table;
 	public static $table_pos;
 	public static $debugging = false;
+	public static $pdf_author;
+	public static $pdf_creationdate;
+	public static $pdf_creator;
+	public static $pdf_producer;
 static function decodeAsciiHex($input) {
     $output = "";
 
@@ -351,6 +355,16 @@ static function pdf2text_fromstring($infile)
 			}
 		}
 	}
+	
+	// :: Get information about author, creator, etc from PDF
+	preg_match_all('#Author.\((.*)\)#ismU',       $infile, $author);
+	preg_match_all('#CreationDate.\((.*)\)#ismU', $infile, $creationDate);
+	preg_match_all('#Creator.\((.*)\)#ismU',      $infile, $creator);
+	preg_match_all('#Producer.\((.*)\)#ismU',     $infile, $producer);
+	if(isset($author[1][0]))       { self::$pdf_author       = $author[1][0]; }
+	if(isset($creationDate[1][0])) { self::$pdf_creationdate = $creationDate[1][0]; }
+	if(isset($creator[1][0]))      { self::$pdf_creator      = $creator[1][0]; }
+	if(isset($producer[1][0]))     { self::$pdf_producer     = $producer[1][0]; }
 
 	return pdf2textwrapper::getTextUsingTransformations($texts, $transformations);
 }
