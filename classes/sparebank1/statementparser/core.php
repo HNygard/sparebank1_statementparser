@@ -20,11 +20,33 @@ class sparebank1_statementparser_core
 	{
 		// Creator "Exstream Dialogue Version 5.0.051" should work
 		// Creator "HP Exstream Version 7.0.605" should work
+		// Creator "M2PD API Version 3.0, build(some date)" does not work
 		
 		pdf2textwrapper::pdf2text_fromstring($infile); // Returns the text, but we are using the table
 		
-		if(!count(pdf2textwrapper::$table))
-		{
+		if(
+			pdf2textwrapper::$pdf_author != 'Registered to: EDB DRFT' &&
+			pdf2textwrapper::$pdf_creator != 'Exstream Dialogue Version 5.0.051' &&
+			pdf2textwrapper::$pdf_creator != 'HP Exstream Version 7.0.605'
+		) {
+			/*
+			echo '<b>Author:</b> '.pdf2textwrapper::$pdf_author.'<br />';
+			echo '<b>Creator:</b> '.pdf2textwrapper::$pdf_creator.'<br />';
+			echo '<b>Producer:</b> '.pdf2textwrapper::$pdf_producer.'<br />';
+			/**/
+			throw new Kohana_Exception('Unknown/unsupported PDF creator.');
+		}
+		
+		if(!count(pdf2textwrapper::$table)) {
+			/*
+			// Add:
+			//    if(self::$debugging) { echo '<pre>'.$data.'</pre>'; }
+			// or something in pdf2textwrapper to debug the current PDF (a failed PDF)
+			pdf2textwrapper::$debugging = true;
+			pdf2textwrapper::pdf2text_fromstring($infile);
+			pdf2textwrapper::$debugging = false;
+			/**/
+
 			throw new Kohana_Exception('PDF parser failed. Unable to read any lines.');
 		}
 		
