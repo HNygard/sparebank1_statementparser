@@ -140,8 +140,9 @@ static function getObjectOptions($object) {
 }
 static function getDecodedStream($stream, $options) {
     $data = "";
-    if (empty($options["Filter"]))
+    if (empty($options["Filter"])) {
         $data = $stream;
+    }
     else {
         $length = !empty($options["Length"]) ? $options["Length"] : strlen($stream);
         $_stream = substr($stream, 0, $length);
@@ -350,8 +351,9 @@ static function pdf2text_fromstring($infile)
 				if (preg_match_all("#BT\n(.*)ET\n#ismU", $data, $textContainers)) {
 					$textContainers = @$textContainers[1];
 					pdf2textwrapper::getDirtyTexts($texts, $textContainers);
-				} else
+				} else {
 					pdf2textwrapper::getCharTransformations($transformations, $data);
+				}
 			}
 		}
 	}
