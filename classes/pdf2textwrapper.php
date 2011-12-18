@@ -170,8 +170,14 @@ static function getDecodedStream($stream, $options) {
  */
 static function getDirtyTexts(&$texts, $textContainers) {
     for ($j = 0; $j < count($textContainers); $j++) {
-        if (preg_match_all("#\[(.*)\]\s*TJ#ismU", $textContainers[$j], $parts))
+        if (preg_match_all("#([0-9\.]*)\s([0-9\.]*)\sTm\n\[\((.*)\)\]\s*TJ#ismU", $textContainers[$j], $parts)) {
+            $texts = array_merge($texts, @$parts[3]);
+            pdf2textwrapper::$table[] = pdf2textwrapper::fixEscape(pdf2textwrapper::stripParentheses($parts[3]));
+            pdf2textwrapper::$table_pos[] = $parts;
+        }
+        elseif (preg_match_all("#\[(.*)\]\s*TJ#ismU", $textContainers[$j], $parts)) {
             $texts = array_merge($texts, @$parts[1]);
+	}
         elseif(preg_match_all("#Td\s*(\(.*\))\s*Tj#ismU", $textContainers[$j], $parts))
 	{
 		pdf2textwrapper::$table[] = pdf2textwrapper::fixEscape(pdf2textwrapper::stripParentheses($parts[1]));
