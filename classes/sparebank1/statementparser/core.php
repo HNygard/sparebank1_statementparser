@@ -10,6 +10,11 @@ class sparebank1_statementparser_core
 	
 	protected $imported = false;
 	
+	private static $lasttransactions_description;
+	private static $lasttransactions_type;
+	private static $lasttransactions_interest_date;
+	private static $lasttransactions_payment_date;
+	
 	/**
 	 * Imports the PDF file from a string to internal variables
 	 *
@@ -20,23 +25,84 @@ class sparebank1_statementparser_core
 	{
 		// Creator "Exstream Dialogue Version 5.0.051" should work
 		// Creator "HP Exstream Version 7.0.605" should work
-		// Creator "M2PD API Version 3.0, build(some date)" does not work
+		// Creator "M2PD API Version 3.0, build(some date)" does not work. Used up to jan 2008.
 		
 		pdf2textwrapper::pdf2text_fromstring($infile); // Returns the text, but we are using the table
 		
+		$this->accounts = array(); // Can be multiple accounts per file
 		if(
-			pdf2textwrapper::$pdf_author != 'Registered to: EDB DRFT' &&
-			pdf2textwrapper::$pdf_creator != 'Exstream Dialogue Version 5.0.051' &&
-			pdf2textwrapper::$pdf_creator != 'HP Exstream Version 7.0.605'
+			pdf2textwrapper::$pdf_author == 'Registered to: EDB DRFT' &&
+			(
+				pdf2textwrapper::$pdf_creator == 'Exstream Dialogue Version 5.0.051' ||
+				pdf2textwrapper::$pdf_creator == 'HP Exstream Version 7.0.605'
+			) 
+		){
+			// Parse and read Exstream PDF
+			$this->parseAndReadExstreamPdf();
+		}
+		elseif (
+			(
+				pdf2textwrapper::$pdf_producer == 'PDFOUT v3.8p by GenText, inc.' || // 04.2005 and earlier
+				pdf2textwrapper::$pdf_producer == 'PDFOUT v3.8q by GenText, inc.'    // 05.2005 and later
+			) &&
+			pdf2textwrapper::$pdf_author   == 'GenText, inc.' &&
+			substr(pdf2textwrapper::$pdf_creator, 0, strlen('M2PD API Version 3.0, build')) == 'M2PD API Version 3.0, build'
 		) {
-			/*
-			echo '<b>Author:</b> '.pdf2textwrapper::$pdf_author.'<br />';
-			echo '<b>Creator:</b> '.pdf2textwrapper::$pdf_creator.'<br />';
-			echo '<b>Producer:</b> '.pdf2textwrapper::$pdf_producer.'<br />';
-			/**/
-			throw new Kohana_Exception('Unknown/unsupported PDF creator.');
+			// Parse and read "M2PD API Version 3.0" (used up to jan 2008)
+			$this->parseAndReadJan2008Pdf();
+		}
+		else {
+			throw new Kohana_Exception('Unknown/unsupported PDF creator.'.
+				' Creator: :pdf_creator'.
+				' Author: :pdf_author'.
+				' Producer: :pdf_producer', 
+				array(
+					':pdf_author'    => pdf2textwrapper::$pdf_author,
+					':pdf_creator'   => pdf2textwrapper::$pdf_creator,
+					':pdf_producer'  => pdf2textwrapper::$pdf_producer,
+				));
 		}
 		
+		// Checking if the PDF is successfully parsed
+		foreach($this->accounts as $account)
+		{
+			// Checking if all parameters have been found
+			if(!isset($account['accountstatement_balance_in']))
+				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_balance_in.');
+			if(!isset($account['accountstatement_balance_out']))
+				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_balance_out.');
+			if(!isset($account['accountstatement_start']))
+				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_start.');
+			if(!isset($account['accountstatement_end']))
+				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_end.');
+			
+			// Checking if the found amount is the same as the control amount found on accountstatement
+			// If not, the file is corrupt or parser has made a mistake
+			if(round($account['control_amount'],2) != $account['accountstatement_balance_out'])
+				throw new Kohana_Exception('PDF parser failed. Controlamount is not correct. '.
+					'Controlamount, calculated: :control_amount. '.
+					'Balance out should be: :accountstatement_balance_out.', 
+					array(
+						':control_amount'                => $account['control_amount'],
+						':accountstatement_balance_out'  => $account['accountstatement_balance_out'],
+					));
+		}
+		
+		// Great success!
+		$this->imported = true;
+		
+		return $this;
+	}
+	
+	/**
+	 * Parse and read data from a Extream PDF
+	 * 
+	 * Can parse data from:
+	 * Author = "Registered to: EDB DRFT"
+	 * Creator = "Exstream Dialogue Version 5.0.051" OR "HP Exstream Version 7.0.605"
+	 */
+	private function parseAndReadExstreamPdf() {
+
 		if(!count(pdf2textwrapper::$table)) {
 			/*
 			// Add:
@@ -55,7 +121,6 @@ class sparebank1_statementparser_core
 		$next_is_fee          = false;
 		$next_is_transactions = false;
 		
-		$this->accounts = array(); // Can be multiple accounts per file
 		$last_account = null;
 		foreach(pdf2textwrapper::$table as $td_id => $td)
 		{
@@ -187,106 +252,34 @@ class sparebank1_statementparser_core
 					$amount = -$amount;
 				}
 				
-				$interest_date = sb1helper::convert_stringDate_to_intUnixtime 
+				self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime 
 					($td[1], date('Y', $this->accounts[$last_account]['accountstatement_end']));
-				$payment_date = sb1helper::convert_stringDate_to_intUnixtime 
+				self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime 
 					($td[3], date('Y', $this->accounts[$last_account]['accountstatement_end']));
 				
-				// Checking description for transaction type 
-				// If found, add to type_pdf and match format for CSV
-				$description = $td[0];
-				self::$lasttransactions_type = '';
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Varer ', 'VARER'); // Varer => VARER:
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Lønn ', 'LØNN'); // Lønn => LØNN:
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Minibank ', 'MINIBANK'); // Minibank => MINIBANK:
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Avtalegiro ', 'AVTALEGIRO'); // Avtalegiro => AVTALEGIRO:
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Overføring ', 'OVERFØRSEL'); // Overføring => Overførsel:
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Valuta ', 'VALUTA'); // Valuta => VALUTA:
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Nettbank til:', 'NETTBANK TIL'); // Nettbank til: => NETTBANK TIL
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Nettbank fra:', 'NETTBANK FRA'); // Nettbank til: => NETTBANK FRA
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Nettgiro til:', 'NETTGIRO TIL'); // Nettgiro til: => NETTGIRO TIL
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Nettgiro fra:', 'NETTGIRO FRA'); // Nettgiro fra: => NETTGIRO FRA
-				$description = self::remove_firstpart_if_found_and_set_type_pdf
-					($description, 'Telegiro fra:', 'TELEGIRO FRA'); // Telegiro fra: => TELEGIRO FRA
-				if(substr($description, 0, 1) == '*' && is_numeric(substr($description, 1, 4))) // *1234 = VISA VARE
-				{
-				}
-				if($next_is_fee)
-				{
-					// 1 Kontohold => Kontohold
-					$description = str_replace('1 Kontohold', 'Kontohold', $description);
-					self::$lasttransactions_type = 'GEBYR';
-				}
+				self::$lasttransactions_description  = $td[0];
+				self::$lasttransactions_type         = '';
 				
-				if(self::$lasttransactions_type == 'VARER')
-				{
-					$description  = trim(substr($description, 5));
-				}
-				
-				if(
-					self::$lasttransactions_type == 'NETTBANK TIL' ||
-					self::$lasttransactions_type == 'NETTBANK FRA' ||
-					self::$lasttransactions_type == 'NETTGIRO TIL' ||
-					self::$lasttransactions_type == 'NETTGIRO FRA' ||
-					self::$lasttransactions_type == 'TELEGIRO FRA'
-				) {
-					// Nettbank til: Some Name Betalt: DD.MM.YY
-					// Nettbank fra: Some Name Betalt: 31.12.99
-					// Nettgiro til: 1234.56.78901 Betalt: 01.01.11
-					// Nettgiro fra: Some Name Betalt: 01.01.11
-					// Telegiro fra: Some Name Betalt: 01.01.11
-					//
-					// Format:
-					// TYPE: TEXT Betalt: 15.10.09
-					//
-					// Nettbank til/Nettbank fra/Nettgiro til are already chopped of
-					
-					// :? Search for "Betalt: " in the text
-					$betalt_pos = strpos($description, 'Betalt: ');
-					if($betalt_pos !== false)
-					{
-						// -> Found "Betalt: "
-						$date_tmp = substr(
-								$description, 
-								$betalt_pos+strlen('Betalt: ')
-							);
-						if(substr($date_tmp, 6) >= 90) // year 1990-1999
-							$date_tmp = substr($date_tmp, 0, 6).'19'.substr($date_tmp, 6);
-						else // year 2000-2099
-							$date_tmp = substr($date_tmp, 0, 6).'20'.substr($date_tmp, 6);
-						$transaction['payment_date']  = sb1helper::convert_stringDate_to_intUnixtime($date_tmp);
-						$description                  = trim(substr($description, 0, $betalt_pos));
-					}
-				}
+				self::parseLastDescription($next_is_fee);
 				
 				$this->accounts[$last_account]['control_amount'] += $amount;
 				$this->accounts[$last_account]['transactions'][] = array(
 						'bankaccount_id'  => $last_account_id,
-						'description'     => $description,
-						'interest_date'   => $interest_date,
+						'description'     => self::$lasttransactions_description,
+						'interest_date'   => self::$lasttransactions_interest_date,
 						'amount'          => ($amount/100),
-						'payment_date'    => $payment_date,
+						'payment_date'    => self::$lasttransactions_payment_date,
 						'type'            => self::$lasttransactions_type,
 					);
 				/*
 				echo '<tr>';
-				echo '<td>'.$description.'</td>';
-				echo '<td>'.date('d.m.Y', $interest_date).'</td>';
+				echo '<td>'.self::$lasttransactions_description.'</td>';
+				echo '<td>'.date('d.m.Y', self::$lasttransactions_interest_date).'</td>';
 				if($amount > 0)
 					echo '<td>&nbsp;</td><td>'.($amount/100).'</td>';
 				else
 					echo '<td>'.($amount/100).'</td><td>&nbsp;</td>';
-				echo '<td>'.date('d.m.Y', $payment_date).'</td>';
+				echo '<td>'.date('d.m.Y', self::$lasttransactions_payment_date).'</td>';
 				
 				echo '</tr>';/**/
 				/*
@@ -395,7 +388,7 @@ class sparebank1_statementparser_core
 			elseif(
 				// Saldo i Dykkar favør
 				(count($td) == 17 && implode($td) == 'SaldoiDykkarfavør') || // Nynorsk
-				(count($td) == 16 && implode($td) == 'SaldoiDeresfavør') // Bokmål
+				(count($td) == 16 && implode($td) == 'SaldoiDeresfavør')     // Bokmål
 			)
 			{
 				// -> Balance out is positive
@@ -483,8 +476,84 @@ class sparebank1_statementparser_core
 		return $this;
 	}
 	
+	static function parseLastDescription ($is_fee) {
+
+		// Checking description for transaction type 
+		// If found, add to type_pdf and match format for CSV
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Varer ', 'VARER'); // Varer => VARER:
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Lønn ', 'LØNN'); // Lønn => LØNN:
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Minibank ', 'MINIBANK'); // Minibank => MINIBANK:
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Avtalegiro ', 'AVTALEGIRO'); // Avtalegiro => AVTALEGIRO:
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Overføring ', 'OVERFØRSEL'); // Overføring => Overførsel:
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Valuta ', 'VALUTA'); // Valuta => VALUTA:
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Nettbank til:', 'NETTBANK TIL'); // Nettbank til: => NETTBANK TIL
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Nettbank fra:', 'NETTBANK FRA'); // Nettbank til: => NETTBANK FRA
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Nettgiro til:', 'NETTGIRO TIL'); // Nettgiro til: => NETTGIRO TIL
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Nettgiro fra:', 'NETTGIRO FRA'); // Nettgiro fra: => NETTGIRO FRA
+		self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf
+			(self::$lasttransactions_description, 'Telegiro fra:', 'TELEGIRO FRA'); // Telegiro fra: => TELEGIRO FRA
+		if(substr(self::$lasttransactions_description, 0, 1) == '*' && is_numeric(substr(self::$lasttransactions_description, 1, 4))) // *1234 = VISA VARE
+		{
+		}
+		if($is_fee)
+		{
+			// 1 Kontohold => Kontohold
+			self::$lasttransactions_description = str_replace('1 Kontohold', 'Kontohold', self::$lasttransactions_description);
+			self::$lasttransactions_type = 'GEBYR';
+		}
 	
-	private static $lasttransactions_type;
+		if(self::$lasttransactions_type == 'VARER')
+		{
+			self::$lasttransactions_description  = trim(substr(self::$lasttransactions_description, 5));
+		}
+	
+		if(
+			self::$lasttransactions_type == 'NETTBANK TIL' ||
+			self::$lasttransactions_type == 'NETTBANK FRA' ||
+			self::$lasttransactions_type == 'NETTGIRO TIL' ||
+			self::$lasttransactions_type == 'NETTGIRO FRA' ||
+			self::$lasttransactions_type == 'TELEGIRO FRA'
+		) {
+			// Nettbank til: Some Name Betalt: DD.MM.YY
+			// Nettbank fra: Some Name Betalt: 31.12.99
+			// Nettgiro til: 1234.56.78901 Betalt: 01.01.11
+			// Nettgiro fra: Some Name Betalt: 01.01.11
+			// Telegiro fra: Some Name Betalt: 01.01.11
+			//
+			// Format:
+			// TYPE: TEXT Betalt: 15.10.09
+			//
+			// Nettbank til/Nettbank fra/Nettgiro til are already chopped of
+		
+			// :? Search for "Betalt: " in the text
+			$betalt_pos = strpos(self::$lasttransactions_description, 'Betalt: ');
+			if($betalt_pos !== false)
+			{
+				// -> Found "Betalt: "
+				$date_tmp = substr(
+						self::$lasttransactions_description, 
+						$betalt_pos+strlen('Betalt: ')
+					);
+				if(substr($date_tmp, 6) >= 90) // year 1990-1999
+					$date_tmp = substr($date_tmp, 0, 6).'19'.substr($date_tmp, 6);
+				else // year 2000-2099
+					$date_tmp = substr($date_tmp, 0, 6).'20'.substr($date_tmp, 6);
+				self::$lasttransactions_payment_date  = sb1helper::convert_stringDate_to_intUnixtime($date_tmp);
+				self::$lasttransactions_description   = trim(substr(self::$lasttransactions_description, 0, $betalt_pos));
+			}
+		}
+	}
+	
 	static function remove_firstpart_if_found_and_set_type_pdf ($description, $search, $type_if_matched)
 	{
 		if(substr($description, 0, strlen($search)) == $search)
