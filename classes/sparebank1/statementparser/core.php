@@ -113,7 +113,7 @@ class sparebank1_statementparser_core
 			pdf2textwrapper::$debugging = false;
 			/**/
 
-			throw new Exception('PDF parser failed. Unable to read any lines.');
+			throw new Exception('PDF parser failed. Unable to read any lines from post jan 2008 PDF.');
 		}
 		
 		$next_is_balance_in   = false;
@@ -458,7 +458,7 @@ class sparebank1_statementparser_core
 			pdf2textwrapper::$debugging = false;
 			/**/
 
-			throw new Exception('PDF parser failed. Unable to read any lines.');
+			throw new Exception('PDF parser failed. Unable to read any lines from pre jan 2008 pdf.');
 		}
 		
 		$next_is_balance_in   = false;
