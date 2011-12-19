@@ -25,7 +25,7 @@ class sparebank1_statementparser_core
 	{
 		// Creator "Exstream Dialogue Version 5.0.051" should work
 		// Creator "HP Exstream Version 7.0.605" should work
-		// Creator "M2PD API Version 3.0, build(some date)" does not work. Used up to jan 2008.
+		// Creator "M2PD API Version 3.0, build(some date)" should work. Used up to jan 2008.
 		
 		pdf2textwrapper::pdf2text_fromstring($infile); // Returns the text, but we are using the table
 		
