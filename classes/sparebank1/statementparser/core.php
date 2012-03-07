@@ -52,15 +52,11 @@ class sparebank1_statementparser_core
 			$this->parseAndReadJan2008Pdf();
 		}
 		else {
-			throw new Kohana_Exception('Unknown/unsupported PDF creator.'.
-				' Creator: :pdf_creator'.
-				' Author: :pdf_author'.
-				' Producer: :pdf_producer', 
-				array(
-					':pdf_author'    => pdf2textwrapper::$pdf_author,
-					':pdf_creator'   => pdf2textwrapper::$pdf_creator,
-					':pdf_producer'  => pdf2textwrapper::$pdf_producer,
-				));
+			throw new Exception('Unknown/unsupported PDF creator.'.
+				' Creator:  '.pdf2textwrapper::$pdf_creator .
+				' Author:   '.pdf2textwrapper::$pdf_author  .
+				' Producer: '.pdf2textwrapper::$pdf_producer
+				);
 		}
 		
 		// Checking if the PDF is successfully parsed
@@ -68,24 +64,21 @@ class sparebank1_statementparser_core
 		{
 			// Checking if all parameters have been found
 			if(!isset($account['accountstatement_balance_in']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_balance_in.');
+				throw new Exception('PDF parser failed. Can not find accountstatement_balance_in.');
 			if(!isset($account['accountstatement_balance_out']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_balance_out.');
+				throw new Exception('PDF parser failed. Can not find accountstatement_balance_out.');
 			if(!isset($account['accountstatement_start']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_start.');
+				throw new Exception('PDF parser failed. Can not find accountstatement_start.');
 			if(!isset($account['accountstatement_end']))
-				throw new Kohana_Exception('PDF parser failed. Can not find accountstatement_end.');
+				throw new Exception('PDF parser failed. Can not find accountstatement_end.');
 			
 			// Checking if the found amount is the same as the control amount found on accountstatement
 			// If not, the file is corrupt or parser has made a mistake
 			if(round($account['control_amount'],2) != $account['accountstatement_balance_out'])
-				throw new Kohana_Exception('PDF parser failed. Controlamount is not correct. '.
-					'Controlamount, calculated: :control_amount. '.
-					'Balance out should be: :accountstatement_balance_out.', 
-					array(
-						':control_amount'                => $account['control_amount'],
-						':accountstatement_balance_out'  => $account['accountstatement_balance_out'],
-					));
+				throw new Exception('PDF parser failed. Controlamount is not correct. '.
+					'Controlamount, calculated: '.$account['control_amount'].'. '.
+					'Balance out should be: '.$account['accountstatement_balance_out'].'.'
+					);
 		}
 		
 		// Great success!
@@ -113,7 +106,7 @@ class sparebank1_statementparser_core
 			pdf2textwrapper::$debugging = false;
 			/**/
 
-			throw new Kohana_Exception('PDF parser failed. Unable to read any lines.');
+			throw new Exception('PDF parser failed. Unable to read any lines.');
 		}
 		
 		$next_is_balance_in   = false;
@@ -185,11 +178,12 @@ class sparebank1_statementparser_core
 					$account_type            = $parts[1]; // Alltid Pluss 18-34
 					
 					$last_account = $account_num.'_'.$accountstatement_start;
-					$tmp = Sprig::factory('bankaccount', array('num' => $account_num))->load();
-					if(!$tmp->loaded())
+					if(isset($this->accountsTranslation[$account_num])) {
+						$last_account_id = $this->accountsTranslation[$account_num];
+					}
+					else {
 						$last_account_id = -1;
-					else
-						$last_account_id = $tmp->id;
+					}
 					
 					// If account spans over several pages, the heading repeats
 					if(!isset($this->accounts[$last_account]))
@@ -458,7 +452,7 @@ class sparebank1_statementparser_core
 			pdf2textwrapper::$debugging = false;
 			/**/
 
-			throw new Kohana_Exception('PDF parser failed. Unable to read any lines.');
+			throw new Exception('PDF parser failed. Unable to read any lines.');
 		}
 		
 		$next_is_balance_in   = false;
@@ -551,7 +545,7 @@ class sparebank1_statementparser_core
 					echo '<tr><td colspan="4"><b>Part 2</b> <pre>'.print_r($parts2, true).'</pre></td></tr>';
 					echo '<tr><td colspan="4"><b>Part 3</b> <pre>'.print_r($parts3, true).'</pre></td></tr>';
 					/**/
-					throw new Kohana_Exception('Not able to retrive account info.');
+					throw new Exception('Not able to retrive account info.');
 				}
 				
 				if($found)
@@ -566,11 +560,12 @@ class sparebank1_statementparser_core
 					$account_type            = $parts[1]; // Alltid Pluss 18-34
 					
 					$last_account = $account_num.'_'.$accountstatement_start;
-					$tmp = Sprig::factory('bankaccount', array('num' => $account_num))->load();
-					if(!$tmp->loaded())
+					if(isset($this->accountsTranslation[$account_num])) {
+						$last_account_id = $this->accountsTranslation[$account_num];
+					}
+					else {
 						$last_account_id = -1;
-					else
-						$last_account_id = $tmp->id;
+					}
 					
 					// If account spans over several pages, the heading repeats
 					if(!isset($this->accounts[$last_account]))
@@ -880,7 +875,7 @@ class sparebank1_statementparser_core
 	public function isImportedOrThrowException ()
 	{
 		if(!$this->imported)
-			throw new Kohana_Exception('PDF file is not imported');
+			throw new Exception('PDF file is not imported');
 	}
 	
 	/**
@@ -892,7 +887,7 @@ class sparebank1_statementparser_core
 	public static function getCSV($account)
 	{
 		if(!isset($account['transactions']))
-			throw new Kohana_Exception('CSV exporter failed. Given account has no transaction variable');
+			throw new Exception('CSV exporter failed. Given account has no transaction variable');
 		
 		$csv = 'Date;Description;Amount'.chr(10);
 		foreach($account['transactions'] as $transaction)
@@ -906,5 +901,18 @@ class sparebank1_statementparser_core
 				$transaction['amount'].chr(10);
 		}
 		return trim($csv);
+	}
+
+	private $accountsTranslation = array();
+	
+	/**
+	 * Set a table for translating account names to database ids 
+	 *
+	 * Key is account "name" (e.g. 1234.21.1234)
+	 * 
+	 * @param  int[]  $accounts
+	 */
+	public function setAccountTranslation($accounts) {
+		$this->accountsTranslation = $accounts;
 	}
 }
