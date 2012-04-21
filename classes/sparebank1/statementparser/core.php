@@ -53,9 +53,10 @@ class sparebank1_statementparser_core
 		}
 		else {
 			throw new Exception('Unknown/unsupported PDF creator.'.
-				' Creator: '.pdf2textwrapper::$pdf_creator.
-				' Author: '.pdf2textwrapper::$pdf_author.
-				' Producer: '.pdf2textwrapper::$pdf_producer);
+				' Creator:  '.pdf2textwrapper::$pdf_creator .
+				' Author:   '.pdf2textwrapper::$pdf_author  .
+				' Producer: '.pdf2textwrapper::$pdf_producer
+				);
 		}
 		
 		// Checking if the PDF is successfully parsed
@@ -177,11 +178,12 @@ class sparebank1_statementparser_core
 					$account_type            = $parts[1]; // Alltid Pluss 18-34
 					
 					$last_account = $account_num.'_'.$accountstatement_start;
-					$tmp = Sprig::factory('bankaccount', array('num' => $account_num))->load();
-					if(!$tmp->loaded())
+					if(isset($this->accountsTranslation[$account_num])) {
+						$last_account_id = $this->accountsTranslation[$account_num];
+					}
+					else {
 						$last_account_id = -1;
-					else
-						$last_account_id = $tmp->id;
+					}
 					
 					// If account spans over several pages, the heading repeats
 					if(!isset($this->accounts[$last_account]))
@@ -558,11 +560,12 @@ class sparebank1_statementparser_core
 					$account_type            = $parts[1]; // Alltid Pluss 18-34
 					
 					$last_account = $account_num.'_'.$accountstatement_start;
-					$tmp = Sprig::factory('bankaccount', array('num' => $account_num))->load();
-					if(!$tmp->loaded())
+					if(isset($this->accountsTranslation[$account_num])) {
+						$last_account_id = $this->accountsTranslation[$account_num];
+					}
+					else {
 						$last_account_id = -1;
-					else
-						$last_account_id = $tmp->id;
+					}
 					
 					// If account spans over several pages, the heading repeats
 					if(!isset($this->accounts[$last_account]))
@@ -898,5 +901,18 @@ class sparebank1_statementparser_core
 				$transaction['amount'].chr(10);
 		}
 		return trim($csv);
+	}
+
+	private $accountsTranslation = array();
+	
+	/**
+	 * Set a table for translating account names to database ids 
+	 *
+	 * Key is account "name" (e.g. 1234.21.1234)
+	 * 
+	 * @param  int[]  $accounts
+	 */
+	public function setAccountTranslation($accounts) {
+		$this->accountsTranslation = $accounts;
 	}
 }

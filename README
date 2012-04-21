@@ -1,0 +1,20 @@
+-- Parser for Sparebank 1 PDF statements --
+- - - - - - - - - - - - - - - - - - - - - -
+
+Can parse PDFs back to around 2004. Both personal and business statements can be parsed.
+
+The code is intended used in Kohana based project. It is used by https://github.com/HNygard/regnskap
+
+PDF files has some attributes. The creator attribute is used to define which format to use:
+Creator "Exstream Dialogue Version 5.0.051" and "HP Exstream Version 7.0.605" has been used in the later years.
+Creator "M2PD API Version 3.0, build(some date)" was used up to jan 2008 (producer PDFOUT v3.8p by GenText, inc. from 04.2005 and earlier, PDFOUT v3.8q by GenText, inc. after 05.2005).
+
+
+-- Setup
+
+Clone the repository:
+	git clone git://github.com/HNygard/sparebank1_statementparser.git
+
+Try out the command line interface:
+	cd sparebank1_statementparser/cli
+	./sb1cli.php "path/to/your.pdf"
