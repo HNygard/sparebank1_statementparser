@@ -6,9 +6,16 @@ Can parse PDFs back to around 2004. Both personal and business statements can be
 The code is intended used in Kohana based project. It is used by https://github.com/HNygard/regnskap
 
 PDF files has some attributes. The creator attribute is used to define which format to use:
-Creator "Exstream Dialogue Version 5.0.051" and "HP Exstream Version 7.0.605" has been used in the later years.
+Creator "Exstream Dialogue Version 5.0.051" or "HP Exstream Version 7.0.605" has been used in the later years (from feb 2008 until at least des 2011).
 Creator "M2PD API Version 3.0, build(some date)" was used up to jan 2008 (producer PDFOUT v3.8p by GenText, inc. from 04.2005 and earlier, PDFOUT v3.8q by GenText, inc. after 05.2005).
 
+Example bank statement:
+https://bank.storebrand.no/portaldemo/images/kontoutskrift.pdf
+
+-- Supported bank statement PDFs
+- Sparebank 1, feb 2008 - des 2011, personal and business accounts
+- Sparebank 1, may 2005 - jan 2008, personal accounts 
+- Sparebank 1,     2002 - apr 2005, personal accounts
 
 -- Setup
 
