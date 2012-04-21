@@ -38,7 +38,7 @@ class sparebank1_statementparser_core
 			) 
 		){
 			// Parse and read Exstream PDF
-			$this->parseAndReadExstreamPdf();
+			$this->parseAndReadExstreamPdf($infile);
 		}
 		elseif (
 			(
@@ -49,7 +49,7 @@ class sparebank1_statementparser_core
 			substr(pdf2textwrapper::$pdf_creator, 0, strlen('M2PD API Version 3.0, build')) == 'M2PD API Version 3.0, build'
 		) {
 			// Parse and read "M2PD API Version 3.0" (used up to jan 2008)
-			$this->parseAndReadJan2008Pdf();
+			$this->parseAndReadJan2008Pdf($infile);
 		}
 		else {
 			throw new Exception('Unknown/unsupported PDF creator.'.
@@ -101,7 +101,7 @@ class sparebank1_statementparser_core
 	 * Author = "Registered to: EDB DRFT"
 	 * Creator = "Exstream Dialogue Version 5.0.051" OR "HP Exstream Version 7.0.605"
 	 */
-	private function parseAndReadExstreamPdf() {
+	private function parseAndReadExstreamPdf($infile) {
 
 		if(!count(pdf2textwrapper::$table)) {
 			/*
@@ -446,7 +446,7 @@ class sparebank1_statementparser_core
 		}
 	}
 	
-	private function parseAndReadJan2008Pdf() {
+	private function parseAndReadJan2008Pdf($infile) {
 
 		if(!count(pdf2textwrapper::$table)) {
 			/*
