@@ -53,14 +53,9 @@ class sparebank1_statementparser_core
 		}
 		else {
 			throw new Exception('Unknown/unsupported PDF creator.'.
-				' Creator: :pdf_creator'.
-				' Author: :pdf_author'.
-				' Producer: :pdf_producer', 
-				array(
-					':pdf_author'    => pdf2textwrapper::$pdf_author,
-					':pdf_creator'   => pdf2textwrapper::$pdf_creator,
-					':pdf_producer'  => pdf2textwrapper::$pdf_producer,
-				));
+				' Creator: '.pdf2textwrapper::$pdf_creator.
+				' Author: '.pdf2textwrapper::$pdf_author.
+				' Producer: '.pdf2textwrapper::$pdf_producer);
 		}
 		
 		// Checking if the PDF is successfully parsed
@@ -78,14 +73,11 @@ class sparebank1_statementparser_core
 			
 			// Checking if the found amount is the same as the control amount found on accountstatement
 			// If not, the file is corrupt or parser has made a mistake
-			if(round($account['control_amount'],2) != $account['accountstatement_balance_out'])
+			if(round($account['control_amount'],2) != $account['accountstatement_balance_out']) {
 				throw new Exception('PDF parser failed. Controlamount is not correct. '.
-					'Controlamount, calculated: :control_amount. '.
-					'Balance out should be: :accountstatement_balance_out.', 
-					array(
-						':control_amount'                => $account['control_amount'],
-						':accountstatement_balance_out'  => $account['accountstatement_balance_out'],
-					));
+					'Controlamount, calculated: '.$account['control_amount'].'. '.
+					'Balance out should be: '.$account['accountstatement_balance_out'].'.');
+			}
 		}
 		
 		// Great success!
