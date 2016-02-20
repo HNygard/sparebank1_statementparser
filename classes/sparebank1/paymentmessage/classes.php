@@ -25,3 +25,7 @@ class Sparebank1Document {
 class Sparebank1PaymentOverviewDocument extends Sparebank1Document {
 	public $bank_account_number;
 }
+class Sparebank1PaymentReceiptDocument extends Sparebank1Document {
+	public $bank_account_number;
+	public $content;
+}

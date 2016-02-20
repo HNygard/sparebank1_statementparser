@@ -345,25 +345,33 @@ class sparebank1_paymentmessage_core
 			// -> This text is first in a new document. Just continue past it.
 			$i++;
 		}
-		if (!$this->isStartOfNewDocument($i, $lines)) {
+		$new_document_with_same_header = isset($this->currentDocument) 
+			&& (isset($lines[$i][1]) && isDate($lines[$i][1]))
+			&& ($lines[$i+1][0] === $this->currentDocument->bank_address);
+		if (!$this->isStartOfNewDocument($i, $lines)
+			&& !$new_document_with_same_header
+		) {
 			return $i;
 		}
 
-		$bank_name = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Retur: ');
+		if(!$new_document_with_same_header) {
+			$bank_name = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Retur: ');
+		}
+		else {
+			$bank_name = 'Not set';
+		}
 		assertLineEquals($i, 0, $lines, 'Dato');
 		$document_date = assertAndGetDate($i++, 1, $lines);
 		$bank_address = $lines[$i++][0];
-		
-		$this->currentDocument = new Sparebank1PaymentOverviewDocument();
-		$this->parsedPdf->addDocument($this->currentDocument);
 
 		echo 'Your bank ....... : ' . $bank_name . $bank_address . chr(10);
 		echo 'Document date ... : ' . $document_date . chr(10);
-		$this->currentDocument->bank_name = $bank_name . $bank_address;
-		$this->currentDocument->document_date = $document_date;
 
-		$i = $this->detectNewPage($i, $lines);
-		
+		if(substr($lines[$i][0], 0, strlen('Sidenr. ')) == 'Sidenr. ') {
+			$page_number = (int)substr($lines[$i++][0], strlen('Sidenr. '));
+			echo ':: Page ' . $page_number . chr(10);
+		}
+				
 		// :: Customer information in header
 		if (!is_numeric($lines[$i][0])) {
 			throwException('was not numeric. It was ['.$lines[$i][0].']', $i, 0, $lines);
@@ -380,13 +388,9 @@ class sparebank1_paymentmessage_core
 		echo 'Customer id ..... : ' . $customer_id . chr(10);
 		echo 'Customer name ... : ' . $customer_name . chr(10);
 		echo 'Customer email .. : ' . $customer_email . chr(10);
-		$this->currentDocument->customer_id = $customer_id;
-		$this->currentDocument->customer_name = $customer_name;
-		$this->currentDocument->customer_email = $customer_email;
 
 		$bank_orgnumber = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Org.nr. ');
 		echo 'Bank org.nr. .... : ' . $bank_orgnumber . chr(10);
-		$this->currentDocument->bank_org_number = $bank_orgnumber;
 
 		// :: Find account owner
 		// If account owner is the same as the customer, it will not be in it's own field
@@ -395,27 +399,54 @@ class sparebank1_paymentmessage_core
 			$bankaccount_owner = assertLineStartsWithAndGetValue($i, 0, $lines, 'Kontoeier er: ') . $lines[$i++][1];
 			echo chr(10);
 			echo 'Bank account owner .... : ' . $bankaccount_owner . chr(10);
-			$this->currentDocument->bank_account_owner = $bankaccount_owner;
 		}
 		else {
-			$this->currentDocument->bank_account_owner = $customer_name;
+			$bankaccount_owner = $customer_name;
 		}
-		var_dump($this->parsedPdf);
 
-		$bankaccount_number = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Innbetalingsoversikt for konto: ');
-		echo 'Bank account number ... : ' . $bankaccount_number . chr(10);
-		$this->currentDocument->bank_account_number = $bankaccount_number;
+		$another_detect_new_document = false;
+		if(isset($lines[$i][23]) && concat(0, 23, $lines[$i]) === 'Belastningsoppgavekonto:') {
+			echo '=> Payment receipt detected'.chr(10);
+			$this->currentDocument = new Sparebank1PaymentReceiptDocument();
+			$bankaccount_number = $lines[$i][24];
+			// :: Collect all the lines in this document
+			$content = array();
+			for(;$i < count($lines); $i++) {
+				$content[] = implode(' ', $lines[$i]);
+				if($lines[$i][0] === 'For teknisk support kontakt Nets brukerstedsservice på 08989.') {
+					// -> Only handling "Belastningsoppgave" from Nets. This is the last line be for payment overviews.
+					$i++;
+					break;
+				}
+			}
+			echo 'Payment receipt: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
+			$this->currentDocument->content = implode(chr(10), $content);
+			$another_detect_new_document = true;
+		}
+		else {
+			$this->currentDocument = new Sparebank1PaymentOverviewDocument();
+			$bankaccount_number = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Innbetalingsoversikt for konto: ');
+			echo 'Bank account number ... : ' . $bankaccount_number . chr(10);
+			
+			// Detect payments by looking at the header
+			assertLineConcat($i++, 0, 16, $lines, 'Betalar:Mottakar:');
+		}
+
 		
-		// Detect payments by looking at the header
-		assertLineConcat($i++, 0, 16, $lines, 'Betalar:Mottakar:');
-		return $i;
-	}
-
-	private function detectNewPage ($i, $lines) {
-		if(substr($lines[$i][0], 0, strlen('Sidenr. ')) == 'Sidenr. ') {
-			$page_number = (int)substr($lines[$i++][0], strlen('Sidenr. '));
-			echo ':: Page ' . $page_number . chr(10);
-			$this->currentDocument->page_number = $page_number;
+		$this->parsedPdf->addDocument($this->currentDocument);
+		$this->currentDocument->bank_name = $bank_name;
+		$this->currentDocument->bank_address = $bank_address;
+		$this->currentDocument->document_date = $document_date;
+		$this->currentDocument->customer_id = $customer_id;
+		$this->currentDocument->customer_name = $customer_name;
+		$this->currentDocument->customer_email = $customer_email;
+		$this->currentDocument->bank_org_number = $bank_orgnumber;
+		$this->currentDocument->bank_account_owner = $bankaccount_owner;
+		$this->currentDocument->bank_account_number = $bankaccount_number;
+		$this->currentDocument->page_number = $page_number;
+		
+		if($another_detect_new_document) {
+			return $this->detectNewDocument($i, $lines);
 		}
 		return $i;
 	}
