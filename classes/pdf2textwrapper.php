@@ -234,8 +234,9 @@ static function fixEscape($strip)
 			str_replace('\\326', 'ö',
 			str_replace('\\323', 'ø',
 			str_replace('\\330', 'Ø',
+			str_replace('\\304', 'Ä',
 				$strip
-			))))))))));
+			)))))))))));
 	}
 }
 static function getCharTransformations(&$transformations, $stream) {
