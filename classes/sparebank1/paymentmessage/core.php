@@ -1,5 +1,7 @@
 <?php defined('SYSPATH') or die('No direct script access.');
 
+require __DIR__ . '/classes.php';
+
 function assertLineStartsWith($line_num, $item_num, $lines, $text) {
     $value = $lines[$line_num][$item_num];
     $value = substr($value, 0, strlen($text));
@@ -80,9 +82,9 @@ function throwException($text, $line_num, $item_num, $lines) {
 	throw new Exception('Line ['.$line_num.'] item ['.$item_num.'] ' . $text . '. The line: '.print_r($lines[$line_num], true));
 }
 
-class sparebank1_statementparser_core
+class sparebank1_paymentmessage_core
 {
-	protected $payments = array();
+	protected $parsedPdf;
 	protected $transactions = array();
 	protected $transactions_new = 0;
 	protected $transactions_not_imported = 0;
@@ -109,7 +111,7 @@ class sparebank1_statementparser_core
 		
 		pdf2textwrapper::pdf2text_fromstring($infile); // Returns the text, but we are using the table
 		
-		$this->payments = array();
+		$this->parsedPdf = new Sparebank1Pdf();
 		if(
 			pdf2textwrapper::$pdf_author === 'Registered to: EDB DRFT' &&
 			pdf2textwrapper::$pdf_creator === 'HP Exstream Version 7.0.605'
@@ -141,6 +143,8 @@ class sparebank1_statementparser_core
 		return $this;
 	}
 
+	private $currentDocument;
+
 	/**
 	 * Creator:  HP Exstream Version 7.0.605 Author:   Registered to: EDB DRFT Producer:
 	 */
@@ -148,38 +152,7 @@ class sparebank1_statementparser_core
 
 		$lines = pdf2textwrapper::$table;
 		$i = 0;
-		$bank_name = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Retur: ');
-		assertLineEquals($i, 0, $lines, 'Dato');
-		$document_date = assertAndGetDate($i++, 1, $lines);
-		$bank_address = $lines[$i++][0];
-		echo 'Your bank ....... : ' . $bank_name . $bank_address . chr(10);
-		echo 'Document date ... : ' . $document_date . chr(10);
-
-		$i = $this->detectNewPage($i, $lines);
-		
-		// :: Customer information in header
-		if (!is_numeric($lines[$i][0])) {
-			throwException('was not numeric. It was ['.$lines[$i][0].']', $i, 0, $lines);
-		}
-		$customer_id = $lines[$i++][0];
-		// Next up should be the name and address this was sent to. In my case name and email.
-		$customer_name = $lines[$i][0];
-		assertLineEquals($i, 1, $lines, 'EPOST :'); // I guess this is not the case for documents sent in snail mail
-		if (filter_var($lines[$i][2], FILTER_VALIDATE_EMAIL) === false) {
-			throwException('was not an email. It was ['.$lines[$i][2].']', $i, 2, $lines);
-		}
-		$customer_email = $lines[$i++][2];
-		// I think $lines[$i][3] is a branch code. Don't care.
-		echo 'Customer id ..... : ' . $customer_id . chr(10);
-		echo 'Customer name ... : ' . $customer_name . chr(10);
-		echo 'Customer email .. : ' . $customer_email . chr(10);
-
-		$bank_orgnumber = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Org.nr. ');
-		echo 'Bank org.nr. .... : ' . $bank_orgnumber . chr(10);
-
-		$bankaccount_owner = assertLineStartsWithAndGetValue($i, 0, $lines, 'Kontoeier er: ') . $lines[$i++][1];
-		echo chr(10);
-		echo 'Bank account owner .... : ' . $bankaccount_owner . chr(10);
+		$i = $this->detectNewDocument ($i, $lines);
 
 		$bankaccount_number = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Innbetalingsoversikt for konto: ');
 		echo 'Bank account number ... : ' . $bankaccount_number . chr(10);
@@ -303,10 +276,60 @@ class sparebank1_statementparser_core
 		}
 	}
 
+	private function detectNewDocument ($i, $lines) {
+
+		$bank_name = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Retur: ');
+		assertLineEquals($i, 0, $lines, 'Dato');
+		$document_date = assertAndGetDate($i++, 1, $lines);
+		$bank_address = $lines[$i++][0];
+		
+		$this->currentDocument = new Sparebank1Document();
+		$this->parsedPdf->addDocument($this->currentDocument);
+
+		echo 'Your bank ....... : ' . $bank_name . $bank_address . chr(10);
+		echo 'Document date ... : ' . $document_date . chr(10);
+		$this->currentDocument->bank_name = $bank_name . $bank_address;
+		$this->currentDocument->document_date = $document_date;
+
+		$i = $this->detectNewPage($i, $lines);
+		
+		// :: Customer information in header
+		if (!is_numeric($lines[$i][0])) {
+			throwException('was not numeric. It was ['.$lines[$i][0].']', $i, 0, $lines);
+		}
+		$customer_id = $lines[$i++][0];
+		// Next up should be the name and address this was sent to. In my case name and email.
+		$customer_name = $lines[$i][0];
+		assertLineEquals($i, 1, $lines, 'EPOST :'); // I guess this is not the case for documents sent in snail mail
+		if (filter_var($lines[$i][2], FILTER_VALIDATE_EMAIL) === false) {
+			throwException('was not an email. It was ['.$lines[$i][2].']', $i, 2, $lines);
+		}
+		$customer_email = $lines[$i++][2];
+		// I think $lines[$i][3] is a branch code. Don't care.
+		echo 'Customer id ..... : ' . $customer_id . chr(10);
+		echo 'Customer name ... : ' . $customer_name . chr(10);
+		echo 'Customer email .. : ' . $customer_email . chr(10);
+		$this->currentDocument->customer_id = $customer_id;
+		$this->currentDocument->customer_name = $customer_name;
+		$this->currentDocument->customer_email = $customer_email;
+
+		$bank_orgnumber = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Org.nr. ');
+		echo 'Bank org.nr. .... : ' . $bank_orgnumber . chr(10);
+		$this->currentDocument->bank_org_number = $bank_orgnumber;
+
+		$bankaccount_owner = assertLineStartsWithAndGetValue($i, 0, $lines, 'Kontoeier er: ') . $lines[$i++][1];
+		echo chr(10);
+		echo 'Bank account owner .... : ' . $bankaccount_owner . chr(10);
+		$this->currentDocument->bank_account_owner = $bankaccount_owner;
+		var_dump($this->parsedPdf);
+		return $i;
+	}
+
 	private function detectNewPage ($i, $lines) {
 		if(substr($lines[$i][0], 0, strlen('Sidenr. ')) == 'Sidenr. ') {
 			$page_number = substr($lines[$i++][0], strlen('Sidenr. '));
 			echo ':: Page ' . $page_number . chr(10);
+			$this->currentDocument->page_number = $page_number;
 		}
 		return $i;
 	}
