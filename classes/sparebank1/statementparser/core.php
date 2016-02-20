@@ -75,6 +75,7 @@ class sparebank1_statementparser_core
 			// Checking if the found amount is the same as the control amount found on accountstatement
 			// If not, the file is corrupt or parser has made a mistake
 			if(round($account['control_amount'],2) != $account['accountstatement_balance_out']) {
+var_dump($account);
 				throw new Exception('PDF parser failed. Controlamount is not correct. '.
 					'Controlamount, calculated: '.$account['control_amount'].'. '.
 					'Balance out should be: '.$account['accountstatement_balance_out'].'.');
@@ -115,7 +116,8 @@ class sparebank1_statementparser_core
 		$next_is_transactions = false;
 		
 		$last_account = null;
-		foreach(pdf2textwrapper::$table as $td_id => $td)
+		$the_table = pdf2textwrapper::$table;
+		foreach($the_table as $td_id => $td)
 		{
 			if(!is_array($td))
 				continue;
@@ -157,7 +159,7 @@ class sparebank1_statementparser_core
 				if(isset($td_tmp[6]))
 					$td[5] = $td_tmp[6];
 			}
-			
+
 			if(
 				// Line with
 				// Example data: Kontoutskrift nr. 2 for konto 1234.12.12345 i perioden 01.02.2011 - 28.02.2011 Alltid Pluss 18-34
@@ -218,7 +220,7 @@ class sparebank1_statementparser_core
 					(
 						// Business accounts
 						count($td) == 5 &&
-						is_numeric($td[4]) // 123321123
+						is_numeric(str_replace('*', '', $td[4])) // 123321123 or *123321123
 					)
 				) &&
 				is_numeric($td[1]) && strlen($td[1]) == 4 && // ddmm, interest_date

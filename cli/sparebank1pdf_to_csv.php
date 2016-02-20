@@ -1,6 +1,8 @@
 #!/usr/bin/php
 <?php
 
+date_default_timezone_set('Europe/Oslo');
+
 define('SYSPATH', '');
 
 require_once __DIR__.'/../classes/pdf2textwrapper.php';
@@ -12,9 +14,11 @@ if(count($argv) != 2) {
 	echo 'No argument given.'.chr(10);
 	echo $_SERVER['PHP_SELF'].' [path to pdf]'.chr(10);
 	echo chr(10).'One CSV file per account in the PDF file will be saved to the same location as the PDF file.'.chr(10);
+
 	exit;
 }
-$file = $argv[1];
+
+$file = file_exists($argv[1])?$argv[1]:getcwd() . '/' . $argv[1];
 echo 'PDF location: '.$file.chr(10).chr(10);
 
 echo 'READING FILE'.chr(10);
