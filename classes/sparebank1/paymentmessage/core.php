@@ -154,6 +154,7 @@ class sparebank1_paymentmessage_core
 		$i = 0;
 		
 		$end_of_file = false;
+		$end_of_payment_overviews = false;
 		while(!$end_of_file) {
 			$i = $this->detectNewDocument ($i, $lines);
 			echo '- '.chr(10);
@@ -247,7 +248,7 @@ class sparebank1_paymentmessage_core
 				assertLineEquals($i++, 0, $lines, 'Beløpet gjelder:');
 				while (true) {
 					$payment_message[] = $lines[$i++][0];
-					if (count($lines) <= $i+1) {
+					if (!isset($lines[$i])) {
 						// -> End of file
 						$end_of_file = true;
 						break;
@@ -258,6 +259,48 @@ class sparebank1_paymentmessage_core
 					}
 					if ($this->isStartOfNewDocument($i, $lines)) {
 						// -> New document is coming up
+						break;
+					}
+					if (strpos($lines[$i][0], 'Kontoutskrift nr. ') !== false) {
+						// -> Next is account statement, move along
+						$end_of_file = true;
+						$end_of_payment_overviews = true;
+						break;
+					}
+					if (strpos($lines[$i][0], 'Innbetalingsoversikt for konto:') !== false) {
+						// -> The next page with payment overview, move along
+
+						// :: Checking values on the next page, in case we missed someting in the parsing
+						$new_page_bank_account_number = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Innbetalingsoversikt for konto: ');
+						assertLineEquals($i, 0, $lines, 'Dato:');
+						$new_page_date = assertAndGetDate($i, 1, $lines);
+						$new_page_number = (int)assertLineStartsWithAndGetValue($i, 2, $lines, 'Sidenr. ');
+						$new_page_customer_id = $lines[$i++][3];
+						if($new_page_bank_account_number !== $this->currentDocument->bank_account_number) {
+							throw new Exception('Current bank account number [' . $this->currentDocument->bank_account_number .'] '.
+								'does not match account number on the next page ['. $new_page_bank_account_number .'].');
+						}
+						if($new_page_number !== $this->currentDocument->page_number + 1) {
+							throw new Exception('Current page number [' . $this->currentDocument->page_number .'] + 1 '.
+								'does not match page number on next page ['. $new_page_number .'].');
+						}
+						if($new_page_date !== $this->currentDocument->document_date) {
+							throw new Exception('Current document date [' . $this->currentDocument->document_date .'] '.
+								'does not match document date on the next page ['. $new_page_date .'].');
+						}
+						$this->currentDocument->page_number = $new_page_number;
+	
+						$new_page_customer_name = $lines[$i][0];
+						assertLineEquals($i, 1, $lines, ', EPOST :');
+						$new_page_customer_email = substr($lines[$i++][2], strlen(', '));
+						if($new_page_customer_name !== $this->currentDocument->customer_name) {
+							throw new Exception('Current customer name [' . $this->currentDocument->customer_name .'] '.
+								'does not match customer name on the next page ['. $new_page_customer_name .'].');
+						}
+						if($new_page_customer_email !== $this->currentDocument->customer_email) {
+							throw new Exception('Current customer email [' . $this->currentDocument->customer_email .'] '.
+								'does not match customer email on the next page ['. $new_page_customer_email .'].');
+						}
 						break;
 					}
 				}
@@ -275,11 +318,22 @@ class sparebank1_paymentmessage_core
 			}
 		}
 
+		if($end_of_payment_overviews) {
+			echo '==> DETECTED END OF PAYMENT OVERVIEWS (Account statement is next).'.chr(10) .
+				'Assuming there are now more overviews in this PDF.'.chr(10);
+			return;
+		}
+
 		// :: Output the rest of the file for debugging
+		$file_eaten = true;
 		for(;$i < count($lines); $i++) {
 			echo ' ----- ' . $i . ' ----- '.chr(10);
 			var_dump($lines[$i]);
 			var_dump(pdf2textwrapper::$table_pos[$i]);
+			$file_eaten = false;
+		}
+		if(!$file_eaten) {
+			throw new Exception('Did not eat the whole file.');
 		}
 	}
 	private function isStartOfNewDocument ($i, $lines) {
@@ -287,6 +341,10 @@ class sparebank1_paymentmessage_core
 	}
 
 	private function detectNewDocument ($i, $lines) {
+		if ($lines[$i][0] === 'Fortsetter på neste side') {
+			// -> This text is first in a new document. Just continue past it.
+			$i++;
+		}
 		if (!$this->isStartOfNewDocument($i, $lines)) {
 			return $i;
 		}
@@ -355,7 +413,7 @@ class sparebank1_paymentmessage_core
 
 	private function detectNewPage ($i, $lines) {
 		if(substr($lines[$i][0], 0, strlen('Sidenr. ')) == 'Sidenr. ') {
-			$page_number = substr($lines[$i++][0], strlen('Sidenr. '));
+			$page_number = (int)substr($lines[$i++][0], strlen('Sidenr. '));
 			echo ':: Page ' . $page_number . chr(10);
 			$this->currentDocument->page_number = $page_number;
 		}
