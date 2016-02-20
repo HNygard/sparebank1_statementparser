@@ -501,6 +501,24 @@ class sparebank1_paymentmessage_core
 			$this->currentDocument->content = implode(chr(10), $content);
 			$another_detect_new_document = true;
 		}
+		else if($lines[$i][0] === 'Årsoppgåve') {
+			echo '=> Yearly statement document detected.'.chr(10);
+			$this->currentDocument = new Sparebank1YearlyStatementDocument();
+			// :: Collect all the lines in this document
+			$content = array();
+			for(;$i < count($lines); $i++) {
+				$content[] = implode(' ', $lines[$i]);
+				if(strpos($lines[$i][0], 'konto for tilbakebetaling av skatt') !== false) {
+					// -> This is the last line in document.
+					//    "Dykkar konto XXXX.XX.XXXXX er oppgitt som ein mogleg konto for tilbakebetaling av skatt"
+					$i++;
+					break;
+				}
+			}
+			echo 'Content: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
+			$this->currentDocument->content = implode(chr(10), $content);
+			$another_detect_new_document = true;
+		}
 		else {
 			$this->currentDocument = new Sparebank1PaymentOverviewDocument();
 			$bankaccount_number = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Innbetalingsoversikt for konto: ');
