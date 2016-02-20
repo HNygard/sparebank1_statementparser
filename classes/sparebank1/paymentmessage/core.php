@@ -158,10 +158,15 @@ class sparebank1_paymentmessage_core
 		while(!$end_of_file) {
 			$i = $this->detectNewDocument ($i, $lines);
 			echo '- '.chr(10);
-			$payment_date = assertAndGetDate($i++, 0, $lines);
+			$paymentMessage = new Sparebank1PaymentMessage();
+			$this->currentDocument->addPaymentMessage($paymentMessage);
+
+			$payment_msg_date = assertAndGetDate($i++, 0, $lines);
 			$payment_amount = assertAndGetAmount($i++, 0, $lines);
-			echo 'Payment date ........ : ' . $payment_date . chr(10);
+			echo 'Payment msg date .... : ' . $payment_msg_date . chr(10);
 			echo 'Payment amount ...... : ' . $payment_amount . chr(10);
+			$paymentMessage->payment_msg_date = $payment_msg_date;
+			$paymentMessage->payment_amount = $payment_amount;
 
 			// Payment from address might be splitted into two $lines
 			// The first might contain 1-3 items
@@ -198,6 +203,7 @@ class sparebank1_paymentmessage_core
 			assertLineConcat($i, 0, 10, $lines, 'Valutadato:');
 			$payment_value_date = assertAndGetDate($i, 11, $lines);
 			echo 'Payment value date .. : ' . $payment_value_date . chr(10);
+			$paymentMessage->payment_value_date = $payment_value_date;
 
 			// 4 options here:
 			// - 12 = payment from postal code and place
@@ -234,12 +240,16 @@ class sparebank1_paymentmessage_core
 			echo 'Payment bank ref .... : ' . $payment_bank_ref . chr(10);
 			echo 'Payment from: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_from).chr(10);
 			echo 'Payment to: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_to).chr(10);
+			$paymentMessage->payment_bank_ref = $payment_bank_ref;
+			$paymentMessage->payment_from = implode(chr(10), $payment_from);
+			$paymentMessage->payment_to = implode(chr(10), $payment_to);
 			$i++;
 
 			assertLineConcat($i, 0, 8, $lines, 'Frakonto:');
 			$payment_from_bank_account = (isset($lines[$i][9]) ? $lines[$i][9] : 'Not set');
 			$i++;
 			echo 'Payment from bank account .. : ' . $payment_from_bank_account . chr(10);
+			$paymentMessage->payment_from_bank_account = $payment_from_bank_account;
 
 			// :: Payment message
 			$payment_message = array();
@@ -313,6 +323,7 @@ class sparebank1_paymentmessage_core
 				}
 			}
 			echo 'Payment message: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_message).chr(10);
+			$paymentMessage->payment_message = implode(chr(10), $payment_message);
 			if(count($payment_message) > 3) {
 				throw new Exception('Found more than 3 lines in payment message. Something might be wrong.');
 			}
