@@ -46,3 +46,6 @@ class Sparebank1PaymentReceiptDocument extends Sparebank1Document {
 class Sparebank1RejectedPaymentDocument extends Sparebank1Document {
 	public $content;
 }
+class Sparebank1PriceChangeDocument extends Sparebank1Document {
+	public $content;
+}

@@ -157,6 +157,10 @@ class sparebank1_paymentmessage_core
 		$end_of_payment_overviews = false;
 		while(!$end_of_file) {
 			$i = $this->detectNewDocument ($i, $lines);
+			if ($i >= count($lines)) {
+				// -> Reached the end of the file.
+				break;
+			}
 			echo '- '.chr(10);
 			$paymentMessage = new Sparebank1PaymentMessage();
 			$this->currentDocument->addPaymentMessage($paymentMessage);
@@ -368,6 +372,10 @@ class sparebank1_paymentmessage_core
 	}
 
 	private function detectNewDocument ($i, $lines) {
+		if (!isset($lines[$i])) {
+			// -> Reached end of file
+			return $i;
+		}
 		if ($lines[$i][0] === 'Fortsetter på neste side') {
 			// -> This text is first in a new document. Just continue past it.
 			$i++;
@@ -454,7 +462,7 @@ class sparebank1_paymentmessage_core
 					break;
 				}
 			}
-			echo 'Payment receipt: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
+			echo 'Content: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
 			$this->currentDocument->content = implode(chr(10), $content);
 			$another_detect_new_document = true;
 		}
@@ -471,7 +479,25 @@ class sparebank1_paymentmessage_core
 					break;
 				}
 			}
-			echo 'Rejected payment content: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
+			echo 'Content: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
+			$this->currentDocument->content = implode(chr(10), $content);
+			$another_detect_new_document = true;
+		}
+		else if($lines[$i][0] === 'Endringer i prislisten') {
+			echo '=> Price change document detected.'.chr(10);
+			$this->currentDocument = new Sparebank1PriceChangeDocument();
+			// :: Collect all the lines in this document
+			$content = array();
+			for(;$i < count($lines); $i++) {
+				$content[] = implode(' ', $lines[$i]);
+				if($lines[$i][0] === 'Med vennlig hilsen') {
+					// -> This is the second last line in price change document. Next line i name of the bank.
+					$i++;
+					$content[] = implode(' ', $lines[$i++]);
+					break;
+				}
+			}
+			echo 'Content: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
 			$this->currentDocument->content = implode(chr(10), $content);
 			$another_detect_new_document = true;
 		}
