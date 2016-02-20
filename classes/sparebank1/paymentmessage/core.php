@@ -272,19 +272,21 @@ class sparebank1_statementparser_core
 			echo 'Payment from bank account .. : ' . $payment_from_bank_account . chr(10);
 
 			// :: Payment message
-			// I've seen 1 to 3 lines here. So let's look for date + amount in the two next fields
-			assertLineEquals($i++, 0, $lines, 'Beløpet gjelder:');
 			$payment_message = array();
-			while (true) {
-				$payment_message[] = $lines[$i++][0];
-				if (count($lines) <= $i+1) {
-					// -> End of file
-					$end_of_file = true;
-					break;
-				}
-				if (isDate($lines[$i][0]) && isAmount($lines[$i+1][0])) {
-					// -> The next payment is coming up
-					break;
+			if ($lines[$i][0] === 'Beløpet gjelder:') {
+				// I've seen 1 to 3 lines here. So let's look for date + amount in the two next fields
+				assertLineEquals($i++, 0, $lines, 'Beløpet gjelder:');
+				while (true) {
+					$payment_message[] = $lines[$i++][0];
+					if (count($lines) <= $i+1) {
+						// -> End of file
+						$end_of_file = true;
+						break;
+					}
+					if (isDate($lines[$i][0]) && isAmount($lines[$i+1][0])) {
+						// -> The next payment is coming up
+						break;
+					}
 				}
 			}
 			echo 'Payment message: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_message).chr(10);
