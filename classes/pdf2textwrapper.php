@@ -10,6 +10,11 @@
  * @see http://www.webcheatsheet.com/php/reading_clean_text_from_pdf.php
  */
 
+function exception_error_handler($errno, $errstr, $errfile, $errline ) {
+    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+}
+set_error_handler("exception_error_handler");
+
 class pdf2textwrapper
 {
 	public static $table;

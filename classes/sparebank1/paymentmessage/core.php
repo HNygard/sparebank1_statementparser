@@ -152,15 +152,10 @@ class sparebank1_paymentmessage_core
 
 		$lines = pdf2textwrapper::$table;
 		$i = 0;
-		$i = $this->detectNewDocument ($i, $lines);
-
-		$bankaccount_number = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Innbetalingsoversikt for konto: ');
-		echo 'Bank account number ... : ' . $bankaccount_number . chr(10);
 		
-		// Detect payments by looking at the header
-		assertLineConcat($i++, 0, 16, $lines, 'Betalar:Mottakar:');
 		$end_of_file = false;
 		while(!$end_of_file) {
+			$i = $this->detectNewDocument ($i, $lines);
 			echo '- '.chr(10);
 			$payment_date = assertAndGetDate($i++, 0, $lines);
 			$payment_amount = assertAndGetAmount($i++, 0, $lines);
@@ -241,12 +236,13 @@ class sparebank1_paymentmessage_core
 			$i++;
 
 			assertLineConcat($i, 0, 8, $lines, 'Frakonto:');
-			$payment_from_bank_account = $lines[$i++][9];
+			$payment_from_bank_account = (isset($lines[$i][9]) ? $lines[$i][9] : 'Not set');
+			$i++;
 			echo 'Payment from bank account .. : ' . $payment_from_bank_account . chr(10);
 
 			// :: Payment message
 			$payment_message = array();
-			if ($lines[$i][0] === 'Beløpet gjelder:') {
+			if (isset($lines[$i]) && $lines[$i][0] === 'Beløpet gjelder:') {
 				// I've seen 1 to 3 lines here. So let's look for date + amount in the two next fields
 				assertLineEquals($i++, 0, $lines, 'Beløpet gjelder:');
 				while (true) {
@@ -260,6 +256,17 @@ class sparebank1_paymentmessage_core
 						// -> The next payment is coming up
 						break;
 					}
+					if ($this->isStartOfNewDocument($i, $lines)) {
+						// -> New document is coming up
+						break;
+					}
+				}
+			}
+			else {
+				// -> No payment message, check for end of file
+				if (count($lines) <= $i+1) {
+					// -> End of file
+					$end_of_file = true;
 				}
 			}
 			echo 'Payment message: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_message).chr(10);
@@ -275,15 +282,21 @@ class sparebank1_paymentmessage_core
 			var_dump(pdf2textwrapper::$table_pos[$i]);
 		}
 	}
+	private function isStartOfNewDocument ($i, $lines) {
+		return substr($lines[$i][0], 0, strlen('Retur: ')) === 'Retur: ' && isDate($lines[$i+1][1]);
+	}
 
 	private function detectNewDocument ($i, $lines) {
+		if (!$this->isStartOfNewDocument($i, $lines)) {
+			return $i;
+		}
 
 		$bank_name = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Retur: ');
 		assertLineEquals($i, 0, $lines, 'Dato');
 		$document_date = assertAndGetDate($i++, 1, $lines);
 		$bank_address = $lines[$i++][0];
 		
-		$this->currentDocument = new Sparebank1Document();
+		$this->currentDocument = new Sparebank1PaymentOverviewDocument();
 		$this->parsedPdf->addDocument($this->currentDocument);
 
 		echo 'Your bank ....... : ' . $bank_name . $bank_address . chr(10);
@@ -317,11 +330,26 @@ class sparebank1_paymentmessage_core
 		echo 'Bank org.nr. .... : ' . $bank_orgnumber . chr(10);
 		$this->currentDocument->bank_org_number = $bank_orgnumber;
 
-		$bankaccount_owner = assertLineStartsWithAndGetValue($i, 0, $lines, 'Kontoeier er: ') . $lines[$i++][1];
-		echo chr(10);
-		echo 'Bank account owner .... : ' . $bankaccount_owner . chr(10);
-		$this->currentDocument->bank_account_owner = $bankaccount_owner;
+		// :: Find account owner
+		// If account owner is the same as the customer, it will not be in it's own field
+		if (strpos($lines[$i][0], 'Kontoeier er:') !== false) {
+			// -> Account owner != Customer getting this PDF
+			$bankaccount_owner = assertLineStartsWithAndGetValue($i, 0, $lines, 'Kontoeier er: ') . $lines[$i++][1];
+			echo chr(10);
+			echo 'Bank account owner .... : ' . $bankaccount_owner . chr(10);
+			$this->currentDocument->bank_account_owner = $bankaccount_owner;
+		}
+		else {
+			$this->currentDocument->bank_account_owner = $customer_name;
+		}
 		var_dump($this->parsedPdf);
+
+		$bankaccount_number = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Innbetalingsoversikt for konto: ');
+		echo 'Bank account number ... : ' . $bankaccount_number . chr(10);
+		$this->currentDocument->bank_account_number = $bankaccount_number;
+		
+		// Detect payments by looking at the header
+		assertLineConcat($i++, 0, 16, $lines, 'Betalar:Mottakar:');
 		return $i;
 	}
 
@@ -335,17 +363,15 @@ class sparebank1_paymentmessage_core
 	}
 	
 	/**
-	 * Returns array with payments found in the file
-	 *
-	 * @return  Sb1Payment[]
+	 * @return  Sparebank1Pdf
 	 */
-	public function getPayments()
+	public function getParsedPdf()
 	{
 		if(!$this->imported) {
 			throw new Exception('PDF file is not imported');
 		}
 		
-		return $this->payments;
+		return $this->parsedPdf;
 	}
 	
 	/**

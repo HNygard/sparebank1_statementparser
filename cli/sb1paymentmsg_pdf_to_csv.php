@@ -27,7 +27,7 @@ $parser->importPDF (file_get_contents($file));
 echo ' ---- Finished reading file'.chr(10).chr(10);
 
 echo 'Found the following payments:'.chr(10);
-var_dump($parser->getPayments());
+var_dump($parser->getParsedPdf());
 /*
 foreach($parser->getAccounts() as $account) {
 	echo $account['account_num'].' '.$account['account_type'].chr(10).
