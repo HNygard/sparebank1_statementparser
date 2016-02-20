@@ -400,7 +400,15 @@ class sparebank1_paymentmessage_core
 		echo 'Customer name ... : ' . $customer_name . chr(10);
 		echo 'Customer email .. : ' . $customer_email . chr(10);
 
-		$bank_orgnumber = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Org.nr. ');
+		if (strpos($lines[$i][0], 'Organisasjon') !== false) {
+			// -> Old "Organisasjonsnr. NO 912345678" format
+			$bank_orgnumber = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Organisasjonsnr. ');
+		}
+		else {
+			// -> Switched to "Org.nr." and added "Foretaksregistert" in 2013
+			//    E.g. "Org.nr. NO 912345678 Foretaksregisteret"
+			$bank_orgnumber = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Org.nr. ');
+		}
 		echo 'Bank org.nr. .... : ' . $bank_orgnumber . chr(10);
 
 		// :: Find account owner
