@@ -168,91 +168,107 @@ class sparebank1_paymentmessage_core
 			$paymentMessage->payment_msg_date = $payment_msg_date;
 			$paymentMessage->payment_amount = $payment_amount;
 
-			// Payment from address might be splitted into two $lines
-			// The first might contain 1-3 items
-
-			// 0 = Pos 1 - Payment from name
-			// 1 = Pos 1 - Payment from street address
-			// 2 = Pos 1 - Payment from postal code and place
-			// 3 = Pos 2 - Payment to name
-			// 4 = Pos 2 - Payment to street address
-			$payment_from = array();
-			$payment_to = array();
-
-			// pdf2textwrapper::$table_pos[$i][0][2] = 656 42 Td (Payment to name) Tj
-			//                                       = 656 84 Td (Payment to name) Tj
-			$payment_to_starts_with = pdf2textwrapper::$table_pos[$i][0][1];
-			$payment_to_starts_with = substr($payment_to_starts_with, strpos($payment_to_starts_with, 'Td (') + strlen('Td ('));
-			$payment_to_starts_with = str_replace(') Tj', '', $payment_to_starts_with);
-			$payment_to_starts_with = pdf2textwrapper::fixEscape($payment_to_starts_with);
-			$payment_to_detected = false;
-			for($j = 0; $j < count($lines[$i]); $j++) {
-				if($lines[$i][$j] == $payment_to_starts_with) {
-					$payment_to_detected = true;
-				}
-				if($payment_to_detected) {
-					$payment_to[] = $lines[$i][$j];
-				}
-				else {
-					$payment_from[] = $lines[$i][$j];
-				}
-			}
-			$i++;
-			
-
-			assertLineConcat($i, 0, 10, $lines, 'Valutadato:');
-			$payment_value_date = assertAndGetDate($i, 11, $lines);
-			echo 'Payment value date .. : ' . $payment_value_date . chr(10);
-			$paymentMessage->payment_value_date = $payment_value_date;
-
-			// 4 options here:
-			// - 12 = payment from postal code and place
-			//   13 = payment to postal code and place
-			//   14 = payment reference number
-			// - 12 = payment from postal code and place
-			//   13 = payment reference number
-			// - 12 = payment to postal code and place
-			//   13 = payment reference number
-			// - 12 = payment reference number
-			// => Check position of 12
-			if (pdf2textwrapper::$table_pos[$i][1][12] === '197') {
-				// -> We have payment from on pos 12
-				$payment_from[] = $lines[$i][12];
-				if (count($lines[$i]) == 14) {
-					$payment_bank_ref = $lines[$i][13];
-				}
-				else {			
-					$payment_to[] = $lines[$i][13];
-					$payment_bank_ref = $lines[$i][14];
-				}
+			$payment_message = array();
+			// Definition of stone age payment:
+			// Somebody fills out an invoice by hand, takes it to the bank, which scans it
+			// => Can't read much from it
+			if (isset($lines[$i+1][8]) && concat(0, 8, $lines[$i+1]) === 'Frakonto:') {
+				echo '=> STONE AGE PAYMENT DETECTED.' . chr(10);
+				echo '   Unable to read data from it.' . chr(10);
+				$paymentMessage->payment_bank_ref = $lines[$i++];
+				$i++;
+				$paymentMessage->payment_from_bank_account = $lines[$i++][0];
+				echo 'Payment bank ref .... : ' . $payment_bank_ref . chr(10);
+				echo 'Payment from bank account .. : ' . $payment_from_bank_account . chr(10);
+				$payment_message[] = 'STONE AGE PAYMENT DETECTED.';
+				$payment_message[] = 'Please look directly at the PDF for payment info.';
 			}
 			else {
-				// -> No payment from on pos 12
-				if (count($lines[$i]) == 13) {
-					$payment_bank_ref = $lines[$i][12];
-				}
-				else {			
-					$payment_to[] = $lines[$i][12];
-					$payment_bank_ref = $lines[$i][13];
-				}
-			}
-			$payment_bank_ref = trim($payment_bank_ref);
-			echo 'Payment bank ref .... : ' . $payment_bank_ref . chr(10);
-			echo 'Payment from: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_from).chr(10);
-			echo 'Payment to: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_to).chr(10);
-			$paymentMessage->payment_bank_ref = $payment_bank_ref;
-			$paymentMessage->payment_from = implode(chr(10), $payment_from);
-			$paymentMessage->payment_to = implode(chr(10), $payment_to);
-			$i++;
+				// Payment from address might be splitted into two $lines
+				// The first might contain 1-3 items
 
-			assertLineConcat($i, 0, 8, $lines, 'Frakonto:');
-			$payment_from_bank_account = (isset($lines[$i][9]) ? $lines[$i][9] : 'Not set');
-			$i++;
-			echo 'Payment from bank account .. : ' . $payment_from_bank_account . chr(10);
-			$paymentMessage->payment_from_bank_account = $payment_from_bank_account;
+				// 0 = Pos 1 - Payment from name
+				// 1 = Pos 1 - Payment from street address
+				// 2 = Pos 1 - Payment from postal code and place
+				// 3 = Pos 2 - Payment to name
+				// 4 = Pos 2 - Payment to street address
+				$payment_from = array();
+				$payment_to = array();
+
+				// pdf2textwrapper::$table_pos[$i][0][2] = 656 42 Td (Payment to name) Tj
+				//                                       = 656 84 Td (Payment to name) Tj
+				$payment_to_starts_with = pdf2textwrapper::$table_pos[$i][0][1];
+				$payment_to_starts_with = substr($payment_to_starts_with, strpos($payment_to_starts_with, 'Td (') + strlen('Td ('));
+				$payment_to_starts_with = str_replace(') Tj', '', $payment_to_starts_with);
+				$payment_to_starts_with = pdf2textwrapper::fixEscape($payment_to_starts_with);
+				$payment_to_detected = false;
+				for($j = 0; $j < count($lines[$i]); $j++) {
+					if($lines[$i][$j] == $payment_to_starts_with) {
+						$payment_to_detected = true;
+					}
+					if($payment_to_detected) {
+						$payment_to[] = $lines[$i][$j];
+					}
+					else {
+						$payment_from[] = $lines[$i][$j];
+					}
+				}
+				$i++;
+			
+
+				assertLineConcat($i, 0, 10, $lines, 'Valutadato:');
+				$payment_value_date = assertAndGetDate($i, 11, $lines);
+				echo 'Payment value date .. : ' . $payment_value_date . chr(10);
+				$paymentMessage->payment_value_date = $payment_value_date;
+
+				// 4 options here:
+				// - 12 = payment from postal code and place
+				//   13 = payment to postal code and place
+				//   14 = payment reference number
+				// - 12 = payment from postal code and place
+				//   13 = payment reference number
+				// - 12 = payment to postal code and place
+				//   13 = payment reference number
+				// - 12 = payment reference number
+				// => Check position of 12
+				if (pdf2textwrapper::$table_pos[$i][1][12] === '197') {
+					// -> We have payment from on pos 12
+					$payment_from[] = $lines[$i][12];
+					if (count($lines[$i]) == 14) {
+						$payment_bank_ref = $lines[$i][13];
+					}
+					else {			
+						$payment_to[] = $lines[$i][13];
+						$payment_bank_ref = $lines[$i][14];
+					}
+				}
+				else {
+					// -> No payment from on pos 12
+					if (count($lines[$i]) == 13) {
+						$payment_bank_ref = $lines[$i][12];
+					}
+					else {			
+						$payment_to[] = $lines[$i][12];
+						$payment_bank_ref = $lines[$i][13];
+					}
+				}
+				$payment_bank_ref = trim($payment_bank_ref);
+				echo 'Payment bank ref .... : ' . $payment_bank_ref . chr(10);
+				echo 'Payment from: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_from).chr(10);
+				echo 'Payment to: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_to).chr(10);
+				$paymentMessage->payment_bank_ref = $payment_bank_ref;
+				$paymentMessage->payment_from = implode(chr(10), $payment_from);
+				$paymentMessage->payment_to = implode(chr(10), $payment_to);
+				$i++;
+
+				assertLineConcat($i, 0, 8, $lines, 'Frakonto:');
+				$payment_from_bank_account = (isset($lines[$i][9]) ? $lines[$i][9] : 'Not set');
+				$i++;
+				echo 'Payment from bank account .. : ' . $payment_from_bank_account . chr(10);
+				$paymentMessage->payment_from_bank_account = $payment_from_bank_account;
+			}
 
 			// :: Payment message
-			$payment_message = array();
 			if (isset($lines[$i]) && $lines[$i][0] === 'Beløpet gjelder:') {
 				// I've seen 1 to 3 lines here. So let's look for date + amount in the two next fields
 				assertLineEquals($i++, 0, $lines, 'Beløpet gjelder:');
