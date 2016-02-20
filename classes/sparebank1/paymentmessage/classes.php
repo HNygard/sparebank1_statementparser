@@ -43,3 +43,6 @@ class Sparebank1PaymentReceiptDocument extends Sparebank1Document {
 	public $bank_account_number;
 	public $content;
 }
+class Sparebank1RejectedPaymentDocument extends Sparebank1Document {
+	public $content;
+}

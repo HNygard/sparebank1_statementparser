@@ -417,7 +417,7 @@ class sparebank1_paymentmessage_core
 
 		$another_detect_new_document = false;
 		if(isset($lines[$i][23]) && concat(0, 23, $lines[$i]) === 'Belastningsoppgavekonto:') {
-			echo '=> Payment receipt detected'.chr(10);
+			echo '=> Payment receipt detected.'.chr(10);
 			$this->currentDocument = new Sparebank1PaymentReceiptDocument();
 			$bankaccount_number = $lines[$i][24];
 			// :: Collect all the lines in this document
@@ -431,6 +431,23 @@ class sparebank1_paymentmessage_core
 				}
 			}
 			echo 'Payment receipt: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
+			$this->currentDocument->content = implode(chr(10), $content);
+			$another_detect_new_document = true;
+		}
+		else if ($lines[$i][0] === 'Ikke utført oppdrag') {
+			echo '=> Rejected payment detected.'.chr(10);
+			$this->currentDocument = new Sparebank1RejectedPaymentDocument();
+			// :: Collect all the lines in this document
+			$content = array();
+			for(;$i < count($lines); $i++) {
+				$content[] = implode(' ', $lines[$i]);
+				if($lines[$i][0] === 'eller ved å ta kontakt med banken.') {
+					// -> This is the last line in the rejected payment overview.
+					$i++;
+					break;
+				}
+			}
+			echo 'Rejected payment content: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
 			$this->currentDocument->content = implode(chr(10), $content);
 			$another_detect_new_document = true;
 		}
@@ -453,7 +470,9 @@ class sparebank1_paymentmessage_core
 		$this->currentDocument->customer_email = $customer_email;
 		$this->currentDocument->bank_org_number = $bank_orgnumber;
 		$this->currentDocument->bank_account_owner = $bankaccount_owner;
-		$this->currentDocument->bank_account_number = $bankaccount_number;
+		if (isset($bankaccount_number)) {
+			$this->currentDocument->bank_account_number = $bankaccount_number;
+		}
 		$this->currentDocument->page_number = $page_number;
 		
 		if($another_detect_new_document) {
