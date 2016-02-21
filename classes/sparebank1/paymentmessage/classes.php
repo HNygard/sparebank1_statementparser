@@ -24,7 +24,7 @@ class Sparebank1Document {
 
 class Sparebank1PaymentOverviewDocument extends Sparebank1Document {
 	public $bank_account_number;
-	private $paymentMessages = array();
+	public $paymentMessages = array();
 	public function addPaymentMessage(Sparebank1PaymentMessage $payment) {
 		$this->paymentMessages[] = $payment;
 	}
