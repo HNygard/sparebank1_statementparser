@@ -179,7 +179,7 @@ class sparebank1_paymentmessage_core
 			if (isset($lines[$i+1][8]) && concat(0, 8, $lines[$i+1]) === 'Frakonto:') {
 				echo '=> STONE AGE PAYMENT DETECTED.' . chr(10);
 				echo '   Unable to read data from it.' . chr(10);
-				$paymentMessage->payment_bank_ref = $lines[$i++];
+				$paymentMessage->payment_bank_ref = implode(' ', $lines[$i++]);
 				$i++;
 				$paymentMessage->payment_from_bank_account = $lines[$i++][0];
 				echo 'Payment bank ref .... : ' . $payment_bank_ref . chr(10);
