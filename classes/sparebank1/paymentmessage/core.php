@@ -321,7 +321,8 @@ class sparebank1_paymentmessage_core
 						$this->currentDocument->page_number = $new_page_number;
 	
 						$new_page_customer_name = $lines[$i][0];
-						assertLineEquals($i, 1, $lines, ', EPOST :');
+						$lines[$i][1] = str_replace('epost :', 'epost:', strtolower($lines[$i][1]));
+						assertLineEquals($i, 1, $lines, ', epost:');
 						$new_page_customer_email = substr($lines[$i++][2], strlen(', '));
 						if($new_page_customer_name !== $this->currentDocument->customer_name) {
 							throw new Exception('Current customer name [' . $this->currentDocument->customer_name .'] '.
@@ -414,7 +415,8 @@ class sparebank1_paymentmessage_core
 		$customer_id = $lines[$i++][0];
 		// Next up should be the name and address this was sent to. In my case name and email.
 		$customer_name = $lines[$i][0];
-		assertLineEquals($i, 1, $lines, 'EPOST :'); // I guess this is not the case for documents sent in snail mail
+		$lines[$i][1] = str_replace(' :', ':', strtolower($lines[$i][1]));
+		assertLineEquals($i, 1, $lines, 'epost:'); // I guess this is not the case for documents sent in snail mail
 		if (filter_var($lines[$i][2], FILTER_VALIDATE_EMAIL) === false) {
 			throwException('was not an email. It was ['.$lines[$i][2].']', $i, 2, $lines);
 		}
