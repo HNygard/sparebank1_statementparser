@@ -20,10 +20,14 @@ function assertLineEquals($line_num, $item_num, $lines, $text) {
     }
 }
 function assertLineConcat($line_num, $item_num_start, $item_num_stop, $lines, $text) {
-    $value = concat($item_num_start, $item_num_stop, $lines[$line_num]);
+    $value = lineConcat($line_num, $item_num_start, $item_num_stop, $lines);
     if ($value !== $text) {
 	throwException('did not equal ['.$text.'] after concating from ['.$item_num_start.'] to ['.$item_num_stop.']. It was ['.$value.']', $line_num, $item_num_start, $lines);
     }
+}
+
+function lineConcat($line_num, $item_num_start, $item_num_stop, $lines) {
+	return concat($item_num_start, $item_num_stop, $lines[$line_num]);
 }
 function concat($item_num_start, $item_num_end, $line) {
 	$return = '';
@@ -114,7 +118,8 @@ class sparebank1_paymentmessage_core
 		$this->parsedPdf = new Sparebank1Pdf();
 		if(
 			pdf2textwrapper::$pdf_author === 'Registered to: EDB DRFT' &&
-			pdf2textwrapper::$pdf_creator === 'HP Exstream Version 7.0.605'
+			(pdf2textwrapper::$pdf_creator === 'HP Exstream Version 7.0.605'
+			|| pdf2textwrapper::$pdf_creator === 'HP Exstream Version 8.0.319 64-bit')
 		){
 			$this->parsePdf($infile);
 		}/*
@@ -527,7 +532,15 @@ class sparebank1_paymentmessage_core
 			echo 'Bank account number ... : ' . $bankaccount_number . chr(10);
 			
 			// Detect payments by looking at the header
-			assertLineConcat($i++, 0, 16, $lines, 'Betalar:Mottakar:');
+			if (lineConcat($i, 0, 16, $lines) == 'Betalar:Mottakar:') {
+				$this->currentDocument->payment_overview_doc_version = 'pre-2016';
+				assertLineConcat($i++, 0, 16, $lines, 'Betalar:Mottakar:');
+			}
+			else {
+				// -> Introduced around december 2016. Using a table.
+				$this->currentDocument->payment_overview_doc_version = '2016';
+				assertLineConcat($i++, 0, 44, $lines, 'Bokførtdato:Beløp:Betalar:Mottakar:Referanse:');
+			}
 		}
 
 		
