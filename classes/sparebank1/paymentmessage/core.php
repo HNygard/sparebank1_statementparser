@@ -187,8 +187,8 @@ class sparebank1_paymentmessage_core
 				$paymentMessage->payment_bank_ref = implode(' ', $lines[$i++]);
 				$i++;
 				$paymentMessage->payment_from_bank_account = $lines[$i++][0];
-				echo 'Payment bank ref .... : ' . $payment_bank_ref . chr(10);
-				echo 'Payment from bank account .. : ' . $payment_from_bank_account . chr(10);
+				echo 'Payment bank ref .... : ' . $paymentMessage->payment_bank_ref . chr(10);
+				echo 'Payment from bank account .. : ' . $paymentMessage->payment_from_bank_account . chr(10);
 				$payment_message[] = 'STONE AGE PAYMENT DETECTED.';
 				$payment_message[] = 'Please look directly at the PDF for payment info.';
 			}
