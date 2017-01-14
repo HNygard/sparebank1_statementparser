@@ -34,7 +34,8 @@ class sparebank1_statementparser_core
 			pdf2textwrapper::$pdf_author == 'Registered to: EDB DRFT' &&
 			(
 				pdf2textwrapper::$pdf_creator == 'Exstream Dialogue Version 5.0.051' ||
-				pdf2textwrapper::$pdf_creator == 'HP Exstream Version 7.0.605'
+				pdf2textwrapper::$pdf_creator == 'HP Exstream Version 7.0.605' ||
+				pdf2textwrapper::$pdf_creator == 'HP Exstream Version 8.0.319 64-bit'
 			) 
 		){
 			// Parse and read Exstream PDF
