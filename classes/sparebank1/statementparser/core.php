@@ -336,14 +336,21 @@ var_dump($account);
 					- 1640, 5 digits positive
 					
 					- 1854, 1 digits negative
+
+					=> Using from 1850 to 1950 as negative
+
+					Business accounts:
+					- 1640, 5 digits positive, "Saldo frå kontoutskrift 31.08.2016", "10.009,00"
+					- 1456, 1 digits negative, "Saldo frå kontoutskrift 31.08.2016", "9,00"
 					
-					Using from 1850 to 1950 as negative
+					=> Using from 1000 to 1456 as negative
 				 */
 				$balance_in = sb1helper::stringKroner_to_intOerer ($td[0]);
 				$pos_amount = pdf2textwrapper::$table_pos[$td_id][1][0];
-				
-				if($pos_amount >= 1850 && $pos_amount <= 1950)
-				{
+				if (
+					($pos_amount >= 1850 && $pos_amount <= 1950)
+					|| ($pos_amount >= 1000 && $pos_amount <= 1456)
+				) {
 					$balance_in = -$balance_in;
 				}
 				$this->accounts[$last_account]['accountstatement_balance_in'] = $balance_in;
