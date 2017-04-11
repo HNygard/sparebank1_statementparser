@@ -307,6 +307,16 @@ class sparebank1_paymentmessage_core
 
 						// :: Checking values on the next page, in case we missed someting in the parsing
 						$new_page_bank_account_number = assertLineStartsWithAndGetValue($i++, 0, $lines, 'Innbetalingsoversikt for konto: ');
+
+
+						// Desember 2016 format. Contains headings first on a new page.
+						if (lineConcat($i, 0, 44, $lines) == 'Bokførtdato:Beløp:Betalar:Mottakar:Referanse:') {
+							assertLineConcat($i++, 0, 44, $lines, 'Bokførtdato:Beløp:Betalar:Mottakar:Referanse:');
+						}
+						if (lineConcat($i, 0, 44, $lines) == 'Bokførtdato:Beløp:Betaler:Mottaker:Referanse:') {
+							assertLineConcat($i++, 0, 44, $lines, 'Bokførtdato:Beløp:Betaler:Mottaker:Referanse:');
+						}
+
 						assertLineEquals($i, 0, $lines, 'Dato:');
 						$new_page_date = assertAndGetDate($i, 1, $lines);
 						$new_page_number = (int)assertLineStartsWithAndGetValue($i, 2, $lines, 'Sidenr. ');
