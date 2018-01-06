@@ -334,7 +334,8 @@ class sparebank1_statementparser_core
 					- 1688, 3 digits positive
 					- 1659, 4 digits positive
 					- 1640, 5 digits positive
-					
+
+				    - 1835, 2 digits negative
 					- 1854, 1 digits negative
 
 					=> Using from 1850 to 1950 as negative
@@ -348,7 +349,7 @@ class sparebank1_statementparser_core
 				$balance_in = sb1helper::stringKroner_to_intOerer ($td[0]);
 				$pos_amount = pdf2textwrapper::$table_pos[$td_id][1][0];
 				if (
-					($pos_amount >= 1850 && $pos_amount <= 1950)
+					($pos_amount >= 1835 && $pos_amount <= 1950)
 					|| ($pos_amount >= 1000 && $pos_amount <= 1456)
 				) {
 					$balance_in = -$balance_in;
