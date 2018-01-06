@@ -3,8 +3,6 @@
 
 date_default_timezone_set('Europe/Oslo');
 
-define('SYSPATH', '');
-
 require_once __DIR__.'/../classes/pdf2textwrapper.php';
 require_once __DIR__.'/../classes/sparebank1/paymentmessage/core.php';
 require_once __DIR__.'/../classes/sb1helper.php';

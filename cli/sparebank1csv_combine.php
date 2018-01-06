@@ -3,9 +3,6 @@
 
 date_default_timezone_set('Europe/Oslo');
 
-define('SYSPATH', '');
-
-
 $grouped_files = array();
 $files = scandir(getcwd());
 foreach($files as $file) {
