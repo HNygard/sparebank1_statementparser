@@ -76,7 +76,7 @@ class sparebank1_statementparser_core
 			// Checking if the found amount is the same as the control amount found on accountstatement
 			// If not, the file is corrupt or parser has made a mistake
 			if(round($account['control_amount'],2) != $account['accountstatement_balance_out']) {
-var_dump($account);
+                var_dump($account);
 				throw new Exception('PDF parser failed. Controlamount is not correct. '.
 					'Controlamount, calculated: '.$account['control_amount'].'. '.
 					'Balance out should be: '.$account['accountstatement_balance_out'].'.');
@@ -597,8 +597,10 @@ var_dump($account);
 			}
 			
 			// Saldo i Dykkar favør, nynorsk
-			// Saldo i Deres favør, bokmål
-			elseif (substr(implode($td),0,strlen('SaldoiD')) == 'SaldoiD') {
+            // Saldo i Deres favør, bokmål
+            // Saldo i vår favør, bokmål
+			elseif (substr(implode($td),0,strlen('SaldoiD')) == 'SaldoiD'
+                || substr(implode($td),0,strlen('Saldoiv')) == 'Saldoiv') {
 
 				/*
 					Possible variants:
@@ -619,7 +621,9 @@ var_dump($account);
 				*/
 				$next_is_transactions        = false;
 
-				$balance_out_is_positive = true; // TODO
+                // Saldo i Dykkar favør, nynorsk
+                // Saldo i Deres favør, bokmål
+				$balance_out_is_positive = substr(implode($td),0,strlen('SaldoiD')) == 'SaldoiD';
 				
 				// Balance out is the 4th element
 				$balance_out = sb1helper::stringKroner_to_intOerer ($td[4]);
@@ -630,8 +634,7 @@ var_dump($account);
 				$this->accounts[$last_account]['accountstatement_balance_out'] = $balance_out;
 
 				//echo '<tr><td colspan="4"><b>BALANCE OUT</b> '.($balance_out/100).'</td></tr>';
-				
-				
+
 				// :: Parse the transations we have collected
 				//
 				// - The thrid last  cell per line is the interest date
@@ -644,22 +647,8 @@ var_dump($account);
 					// - Heading be for fee (the next transations are fees)
 					// - Ignore "Overført frå forrige side"
 					// - Transactions
-					
-					if(substr(implode($value),0,strlen('Saldofr')) == 'Saldofr') {
-						
-						$balance_in_is_positive = true; // TODO
-						
-						$balance_in = sb1helper::stringKroner_to_intOerer ($value[count($value)-1]);
-						if(!$balance_in_is_positive) {
-							// -> Negative balance
-							$balance_in = -$balance_in;
-						}
-						$this->accounts[$last_account]['accountstatement_balance_in'] = $balance_in;
-						$this->accounts[$last_account]['control_amount'] 
-							+= $this->accounts[$last_account]['accountstatement_balance_in'];
-					}
-					
-					elseif(substr(implode($value),0,strlen('Kostnadervedbrukavbanktenester:')) 
+
+					if(substr(implode($value),0,strlen('Kostnadervedbrukavbanktenester:'))
 						== 'Kostnadervedbrukavbanktenester:') {
 						$next_is_fee = true;
 					}
@@ -671,18 +660,30 @@ var_dump($account);
 					
 					else {
 						// -> Transactions
-							
-						$key_payment_date   = count($value)-1;
-						$key_amount         = count($value)-2;
-						$key_interest_date  = count($value)-3;
-						
-						$payment_date   = $value[$key_payment_date];
+
+                        $is_balance_from_last_month = substr(implode($value),0,strlen('Saldofr')) == 'Saldofr';
+
+                        if ($is_balance_from_last_month) {
+                            $key_amount = count($value) - 1;
+                        }
+                        else {
+                            $key_payment_date = count($value) - 1;
+                            $key_amount = count($value) - 2;
+                            $key_interest_date = count($value) - 3;
+                            $payment_date   = $value[$key_payment_date];
+                            $interest_date  = $value[$key_interest_date];
+                            unset($value[$key_payment_date]);
+                            unset($value[$key_interest_date]);
+
+                            self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime
+                            ($interest_date, date('Y', $this->accounts[$last_account]['accountstatement_end']));
+                            self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime
+                            ($payment_date, date('Y', $this->accounts[$last_account]['accountstatement_end']));
+                        }
+
 						$amount         = $value[$key_amount];
-						$interest_date  = $value[$key_interest_date];
-						
-						unset($value[$key_payment_date]);
+
 						unset($value[$key_amount]);
-						unset($value[$key_interest_date]);
 						
 						$amount = sb1helper::stringKroner_to_intOerer($amount);
 						$pos_amount  = $table_width[$key][$key_amount];
@@ -698,25 +699,17 @@ var_dump($account);
 						if($pos_amount < 422) {
 							$amount = -$amount;
 						}
-						
-						/*
-						// Debugging
-						echo
-							'<tr>'.
-								'<td style="width: 100px;">'.$payment_date.'</td>'.
-								'<td style="width: 100px;">'.($amount/100).'</td>'.
-								'<td style="width: 100px;">'.$interest_date.'</td>'.
-								'<td>'.$pos_amount .' '.implode(' ',$value).'</td>'.
-							'</tr>';
-						/**/
-
-						self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime 
-							($interest_date, date('Y', $this->accounts[$last_account]['accountstatement_end']));
-						self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime 
-							($payment_date, date('Y', $this->accounts[$last_account]['accountstatement_end']));
 				
 						self::$lasttransactions_description  = implode(' ', $value);
 						self::$lasttransactions_type         = '';
+
+                        if($is_balance_from_last_month) {
+                            $this->accounts[$last_account]['accountstatement_balance_in'] = $amount;
+                            $this->accounts[$last_account]['control_amount']
+                                += $this->accounts[$last_account]['accountstatement_balance_in'];
+                            continue;
+                        }
+
 				
 						self::parseLastDescription($next_is_fee);
 				
