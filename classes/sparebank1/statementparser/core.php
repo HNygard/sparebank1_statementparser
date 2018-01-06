@@ -587,7 +587,7 @@ class sparebank1_statementparser_core
 							'account_num'             => $account_num,
 							'accountstatement_start'  => $accountstatement_start,
 							'accountstatement_end'    => $accountstatement_end,
-							'account_type'            => $account_type,
+							'account_type'            => mb_convert_encoding($account_type, 'UTF-8', 'Windows-1252'),
 							'transactions'            => array(),
 							'control_amount'          => 0,
 						);
@@ -717,7 +717,7 @@ class sparebank1_statementparser_core
 						$this->accounts[$last_account]['control_amount'] += $amount;
 						$this->accounts[$last_account]['transactions'][] = array(
 								'bankaccount_id'  => $last_account_id,
-								'description'     => self::$lasttransactions_description,
+								'description'     => mb_convert_encoding(self::$lasttransactions_description, 'UTF-8', 'Windows-1252'),
 								'interest_date'   => self::$lasttransactions_interest_date,
 								'amount'          => ($amount/100),
 								'payment_date'    => self::$lasttransactions_payment_date,
