@@ -120,8 +120,9 @@ class sparebank1_statementparser_core
 		$the_table = pdf2textwrapper::$table;
 		foreach($the_table as $td_id => $td)
 		{
-			if(!is_array($td))
-				continue;
+			if(!is_array($td)) {
+                continue;
+            }
 			
 			// Checking and fixing multiline transactions
 			if
@@ -165,10 +166,11 @@ class sparebank1_statementparser_core
 				// Line with
 				// Example data: Kontoutskrift nr. 2 for konto 1234.12.12345 i perioden 01.02.2011 - 28.02.2011 Alltid Pluss 18-34
 				count($td) == 1 &&
-				substr($td[0], 0, strlen('Kontoutskrift nr. ')) == 'Kontoutskrift nr. '
+                (substr($td[0], 0, strlen('Kontoutskrift nr. ')) == 'Kontoutskrift nr. '
+                || substr($td[0], 0, strlen('Korrigert kontoutskrift nr. ')) == 'Korrigert kontoutskrift nr. ')
 			)
 			{
-				preg_match('/Kontoutskrift nr. (.*) for konto (.*) i perioden (.*) - (.*)/', $td[0], $parts);
+				preg_match('/(?:Korrigert kontoutskrift|Kontoutskrift) nr. (.*) for konto (.*) i perioden (.*) - (.*)/', $td[0], $parts);
 				if(count($parts) == 5)
 				{
 					$accountstatement_num    = $parts[1]; // 2
@@ -248,8 +250,8 @@ class sparebank1_statementparser_core
 				{
 					$amount = -$amount;
 				}
-				
-				self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime 
+
+				self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime
 					($td[1], date('Y', $this->accounts[$last_account]['accountstatement_end']));
 				self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime 
 					($td[3], date('Y', $this->accounts[$last_account]['accountstatement_end']));
@@ -309,10 +311,12 @@ class sparebank1_statementparser_core
 			*/
 			elseif(
 				// Saldo frå kontoutskrift dd.mm.yyyy
-				count($td) == 4 && 
-				trim($td[0]) == 'Saldo' &&
-				(trim($td[1]) == 'frå' || trim($td[1]) == 'fra') && // Nynorsk and bokmål
-				trim($td[2]) == 'kontoutskrift'
+                (
+                    count($td) == 4 &&
+                    trim($td[0]) == 'Saldo' &&
+                    (trim($td[1]) == 'frå' || trim($td[1]) == 'fra') && // Nynorsk and bokmål
+                    trim($td[2]) == 'kontoutskrift'
+                ) || (count($td) == 3 && trim($td[0]) == 'Saldo' && trim($td[1]) == 'frå' && substr(trim($td[2]), 0, strlen('kontoutskrift')) == 'kontoutskrift')
 			)
 			{
 				$next_is_balance_in = true;
@@ -484,8 +488,11 @@ class sparebank1_statementparser_core
 			echo '<tr><td colspan="4">'.implode('', $td).'</td></tr>';
 			echo '<tr><td colspan="4" style="color: gray;">'.print_r($td, true).'</td></tr>';
 			/**/
-			
-			if($td[0] == 'Kontoutskrift' && $td[1] == 'nr.') {
+
+			if(
+                ($td[0] == 'Kontoutskrift' && $td[1] == 'nr.')
+            || ($td[0] == 'Korrigert' && $td[1] == 'kontoutskrift' && $td[2] == 'nr.')
+            ) {
 				/*
 					THIS LINE ($td)
 						[0] => Kontoutskrift 
@@ -530,11 +537,11 @@ class sparebank1_statementparser_core
 				$this_line = implode($td, ' ');
 				$next_line = implode(pdf2textwrapper::$table[$td_id+1], ' ');
 				
-				preg_match('/Kontoutskrift nr. (.*) for konto (.*) i perioden (.*) - (.*) IBAN(.*)/', 
+				preg_match('/(?:Korrigert kontoutskrift|Kontoutskrift) nr. (.*) for konto (.*) i perioden (.*) - (.*) IBAN(.*)/',
 					$this_line.' - '.$next_line, $parts1);
-				preg_match('/Kontoutskrift nr. (.*) for konto (.*) i perioden (.*)-(.*)/', 
+				preg_match('/(?:Korrigert kontoutskrift|Kontoutskrift) nr. (.*) for konto (.*) i perioden (.*)-(.*)/',
 					$this_line, $parts2);
-				preg_match('/Kontoutskrift nr. (.*) for konto (.*) i perioden (.*) - (.*)/', 
+				preg_match('/(?:Korrigert kontoutskrift|Kontoutskrift) nr. (.*) for konto (.*) i perioden (.*) - (.*)/',
 					$this_line.' - '.$next_line, $parts3);
 				$found = false;
 				if(count($parts1) == 6) {
@@ -558,7 +565,7 @@ class sparebank1_statementparser_core
 					/**/
 					throw new Exception('Not able to retrive account info.');
 				}
-				
+
 				if($found)
 				{
 					$accountstatement_num    = $parts[1]; // 2
