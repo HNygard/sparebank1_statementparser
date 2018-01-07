@@ -23,6 +23,8 @@ class sparebank1_statementparser_exstream_pdf extends sparebank1_statementparser
 
         $accounts = array();
         $last_account = null;
+        $last_account_id = -1;
+        $balance_out_is_positive = null;
         $the_table = pdf2textwrapper::$table;
         foreach ($the_table as $td_id => $td) {
             if (!is_array($td)) {
@@ -138,7 +140,6 @@ class sparebank1_statementparser_exstream_pdf extends sparebank1_statementparser
                 $amount = sb1helper::stringKroner_to_intOerer($td[2]);
 
                 $pos_amount = pdf2textwrapper::$table_pos[$td_id][1][2];
-                $pos_payment_date = pdf2textwrapper::$table_pos[$td_id][1][3];
 
                 // If pos_amount is less than 365, the money goes out of the account
                 // If pos_amount is more than 365, the money goes into the account

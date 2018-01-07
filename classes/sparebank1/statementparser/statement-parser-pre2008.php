@@ -7,12 +7,8 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
             throw new Exception('PDF parser failed. Unable to read any lines from pre jan 2008 pdf.');
         }
 
-        $next_is_balance_in = false;
-        $next_is_balance_out = false;
         $next_is_fee = false;
         $next_is_transactions = false;
-        $next_is_heading_part_two = false;
-        $next_is_heading_part_three = false;
 
         $last_account = null;
 
@@ -22,11 +18,6 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
         $last_height = -1;
         $is_bank_account_statement_with_reference_numbers = false;
         foreach (pdf2textwrapper::$table as $td_id => $td) {
-            /*
-            // Debugging
-            echo '<tr><td colspan="4">'.implode('', $td).'</td></tr>';
-            echo '<tr><td colspan="4" style="color: gray;">'.print_r($td, true).'</td></tr>';
-            /**/
 
             if (
                 ($td[0] == 'Kontoutskrift' && $td[1] == 'nr.')
@@ -124,7 +115,6 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
                         'transactions' => array(),
                         'control_amount' => 0,
                     );
-                    //echo '<tr><td>Account: <b>'.$account_num.'</b></td></tr>';
                 }
                 $next_is_fee = false;
             }
@@ -297,7 +287,6 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
             }
 
             elseif (preg_match('/Dato[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9][0-9][0-9]Sidenr/', implode($td))) {
-                //echo '<tr><td colspan="4"><b>NEW PAGE</b></td></tr>';
                 $next_is_transactions = false; // Don't start parsing transactions until the heading has been parsed
                 $last_height = -1;    // Start the count again
             }
