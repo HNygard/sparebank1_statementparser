@@ -543,65 +543,52 @@ class sparebank1_statementparser_core
 					$this_line, $parts2);
 				preg_match('/(?:Korrigert kontoutskrift|Kontoutskrift) nr. (.*) for konto (.*) i perioden (.*) - (.*)/',
 					$this_line.' - '.$next_line, $parts3);
-				$found = false;
 				if(count($parts1) == 6) {
 					$parts = $parts1;
-					$found = true;
 				}
 				elseif(count($parts2) == 5) {
 					$parts = $parts2;
-					$found = true;
 				}
 				elseif(count($parts3) == 5) {
 					$parts = $parts3;
-					$found = true;
 				}
 				else {
-					/*
-					// Debugging:
-					echo '<tr><td colspan="4"><b>Part 1</b> <pre>'.print_r($parts1, true).'</pre></td></tr>';
-					echo '<tr><td colspan="4"><b>Part 2</b> <pre>'.print_r($parts2, true).'</pre></td></tr>';
-					echo '<tr><td colspan="4"><b>Part 3</b> <pre>'.print_r($parts3, true).'</pre></td></tr>';
-					/**/
-					throw new Exception('Not able to retrive account info.');
+					throw new Exception('Not able to retrieve account info.');
 				}
 
-				if($found)
-				{
-					$accountstatement_num    = $parts[1]; // 2
-					$account_num             = $parts[2]; // 1234.12.12345
-					$accountstatement_start  = sb1helper::convert_stringDate_to_intUnixtime
-					                        ($parts[3]); // 01.02.2011
-					$parts  = explode(' ',$parts[4], 2); // 28.02.2011 Alltid Pluss 18-34
-					$accountstatement_end    = sb1helper::convert_stringDate_to_intUnixtime 
-					                         ($parts[0]); // 28.02.2011
-					$account_type            = $parts[1]; // Alltid Pluss 18-34
-					
-					$last_account = $account_num.'_'.$accountstatement_start;
-					if(isset($this->accountsTranslation[$account_num])) {
-						$last_account_id = $this->accountsTranslation[$account_num];
-					}
-					else {
-						$last_account_id = -1;
-					}
-					
-					// If account spans over several pages, the heading repeats
-					if(!isset($this->accounts[$last_account]))
-					{
-						$this->accounts[$last_account] = array(
-							'accountstatement_num'    => $accountstatement_num,
-							'account_id'              => $last_account_id,
-							'account_num'             => $account_num,
-							'accountstatement_start'  => $accountstatement_start,
-							'accountstatement_end'    => $accountstatement_end,
-							'account_type'            => mb_convert_encoding($account_type, 'UTF-8', 'Windows-1252'),
-							'transactions'            => array(),
-							'control_amount'          => 0,
-						);
-						//echo '<tr><td>Account: <b>'.$account_num.'</b></td></tr>';
-					}
-					$next_is_fee               = false;
-				}
+                $accountstatement_num    = $parts[1]; // 2
+                $account_num             = $parts[2]; // 1234.12.12345
+                $accountstatement_start  = sb1helper::convert_stringDate_to_intUnixtime
+                                        ($parts[3]); // 01.02.2011
+                $parts  = explode(' ',$parts[4], 2); // 28.02.2011 Alltid Pluss 18-34
+                $accountstatement_end    = sb1helper::convert_stringDate_to_intUnixtime
+                                         ($parts[0]); // 28.02.2011
+                $account_type            = $parts[1]; // Alltid Pluss 18-34
+
+                $last_account = $account_num.'_'.$accountstatement_start;
+                if(isset($this->accountsTranslation[$account_num])) {
+                    $last_account_id = $this->accountsTranslation[$account_num];
+                }
+                else {
+                    $last_account_id = -1;
+                }
+
+                // If account spans over several pages, the heading repeats
+                if(!isset($this->accounts[$last_account]))
+                {
+                    $this->accounts[$last_account] = array(
+                        'accountstatement_num'    => $accountstatement_num,
+                        'account_id'              => $last_account_id,
+                        'account_num'             => $account_num,
+                        'accountstatement_start'  => $accountstatement_start,
+                        'accountstatement_end'    => $accountstatement_end,
+                        'account_type'            => mb_convert_encoding($account_type, 'UTF-8', 'Windows-1252'),
+                        'transactions'            => array(),
+                        'control_amount'          => 0,
+                    );
+                    //echo '<tr><td>Account: <b>'.$account_num.'</b></td></tr>';
+                }
+                $next_is_fee               = false;
 			}
 			
 			// Saldo i Dykkar favør, nynorsk
@@ -640,8 +627,6 @@ class sparebank1_statementparser_core
 					$balance_out = -$balance_out;
 				}
 				$this->accounts[$last_account]['accountstatement_balance_out'] = $balance_out;
-
-				//echo '<tr><td colspan="4"><b>BALANCE OUT</b> '.($balance_out/100).'</td></tr>';
 
 				// :: Parse the transations we have collected
 				//
