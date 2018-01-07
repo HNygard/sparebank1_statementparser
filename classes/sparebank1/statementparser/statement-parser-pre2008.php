@@ -13,9 +13,12 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
         $last_account = null;
 
         $accounts = array();
+	$current_account_page = 0;
         $table = array();
         $table_width = array();
+        $table_height = array();
         $last_height = -1;
+        $last_height_and_page = -1;
         $is_bank_account_statement_with_reference_numbers = false;
         foreach (pdf2textwrapper::$table as $td_id => $td) {
 
@@ -116,6 +119,7 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
                         'control_amount' => 0,
                     );
                 }
+		$current_account_page++;
                 $next_is_fee = false;
             }
 
@@ -217,10 +221,8 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
                             unset($value[$key_payment_date]);
                             unset($value[$key_interest_date]);
 
-                            self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime
-                            ($interest_date, date('Y', $accounts[$last_account]['accountstatement_end']));
-                            self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime
-                            ($payment_date, date('Y', $accounts[$last_account]['accountstatement_end']));
+                            self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime($interest_date, date('Y', $accounts[$last_account]['accountstatement_end']));
+                            self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime($payment_date, date('Y', $accounts[$last_account]['accountstatement_end']));
                         }
 
                         $amount = $value[$key_amount];
@@ -295,36 +297,38 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
                 // All transactions are on one line in this format
 
                 // Parse this line based on height in PDF
-                // Transactions can be multi line in the description field
+                // Note 1: Transactions can be multi line in the description field. Merging.
                 foreach ($td as $key => $value) {
                     $position_width = pdf2textwrapper::$table_pos[$td_id][1][$key];
                     $position_height = pdf2textwrapper::$table_pos[$td_id][2][$key];
+                    $position_height_and_page = $current_account_page . '_' . $position_height;
 
-                    //echo '<tr><td colspan="4">PARSE TRANSACTION: '.$position_width .' - '.$position_height.': '.$value.'</td></tr>';
-
-                    if (!isset($table[$position_height])) {
-                        $table      [$position_height] = array();
-                        $table_width[$position_height] = array();
+                    if (!isset($table[$position_height_and_page])) {
+                        $table       [$position_height_and_page] = array();
+                        $table_width [$position_height_and_page] = array();
+                        $table_height[$position_height_and_page] = array();
                     }
 
                     if ($last_height != -1 && $last_height < $position_height) {
                         // -> The last line was a part of this line
 
                         // Merge the last into this line
-                        $table      [$position_height] =
-                            array_merge($table[$position_height], $table[$last_height]);
-                        $table_width[$position_height] =
-                            array_merge($table_width[$position_height], $table_width[$last_height]);
+                        $table       [$position_height_and_page] = array_merge($table[$position_height_and_page], $table[$last_height_and_page]);
+                        $table_width [$position_height_and_page] = array_merge($table_width[$position_height_and_page], $table_width[$last_height_and_page]);
+                        $table_height[$position_height_and_page] = array_merge($table_height[$position_height_and_page], $table_height[$last_height_and_page]);
 
                         // Unset the partial line
-                        unset($table      [$last_height]);
-                        unset($table_width[$last_height]);
+                        unset($table       [$last_height_and_page]);
+                        unset($table_width [$last_height_and_page]);
+                        unset($table_height[$last_height_and_page]);
                     }
 
-                    $table      [$position_height][] = $value;
-                    $table_width[$position_height][] = $position_width;
+                    $table       [$position_height_and_page][] = $value;
+                    $table_width [$position_height_and_page][] = $position_width;
+                    $table_height[$position_height_and_page][] = $position_height;
 
                     $last_height = $position_height;
+                    $last_height_and_page = $position_height_and_page;
                 }
             }
         }
