@@ -198,7 +198,13 @@ class sparebank1_statementparser_exstream_pdf extends sparebank1_statementparser
                     trim($td[0]) == 'Saldo' &&
                     (trim($td[1]) == 'frå' || trim($td[1]) == 'fra') && // Nynorsk and bokmål
                     trim($td[2]) == 'kontoutskrift'
-                ) || (count($td) == 3 && trim($td[0]) == 'Saldo' && trim($td[1]) == 'frå' && substr(trim($td[2]), 0, strlen('kontoutskrift')) == 'kontoutskrift')
+                )
+                || (
+                    count($td) == 3
+                    && trim($td[0]) == 'Saldo'
+                    && (trim($td[1]) == 'frå' || trim($td[1]) == 'fra')
+                    && substr(trim($td[2]), 0, strlen('kontoutskrift')) == 'kontoutskrift'
+                )
             ) {
                 $next_is_balance_in = true;
             }

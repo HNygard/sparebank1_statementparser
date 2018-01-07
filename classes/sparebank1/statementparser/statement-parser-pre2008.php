@@ -21,7 +21,6 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
         $last_height_and_page = -1;
         $is_bank_account_statement_with_reference_numbers = false;
         foreach (pdf2textwrapper::$table as $td_id => $td) {
-
             if (
                 ($td[0] == 'Kontoutskrift' && $td[1] == 'nr.')
                 || ($td[0] == 'Korrigert' && $td[1] == 'kontoutskrift' && $td[2] == 'nr.')
