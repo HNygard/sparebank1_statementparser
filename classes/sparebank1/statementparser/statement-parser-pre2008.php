@@ -207,8 +207,8 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
                                     // -> Remove *
                                     unset($value[count($value) - 1]);
                                 }
-                                if (strlen($value[count($value) - 1]) != 4) {
-                                    // -> Second column of ref
+                                if (strlen($value[count($value) - 1]) != 4 || substr($value[count($value) - 1], 2, 2) > 12) {
+                                    // -> Second column of ref. Non 4 char numeric. OR the 4 char numeric can't be a date.
                                     unset($value[count($value) - 1]);
                                 }
                             }
