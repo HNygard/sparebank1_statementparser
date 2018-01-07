@@ -481,6 +481,7 @@ class sparebank1_statementparser_core
 
 		$table = array(); $table_width = array();
 		$last_height = -1;
+        $is_bank_account_statement_with_reference_numbers = false;
 		foreach(pdf2textwrapper::$table as $td_id => $td)
 		{
 			/*
@@ -641,10 +642,14 @@ class sparebank1_statementparser_core
 					// - Ignore "Overført frå forrige side"
 					// - Transactions
 
-					if(substr(implode($value),0,strlen('Kostnadervedbrukavbanktenester:'))
-						== 'Kostnadervedbrukavbanktenester:') {
-						$next_is_fee = true;
-					}
+                    if (
+                        // Nynorsk
+                        (substr(implode($value), 0, strlen('Kostnadervedbrukavbanktenester:')) == 'Kostnadervedbrukavbanktenester:')
+                        // Bokmål
+                        || (substr(implode($value), 0, strlen('Kostnadervedbrukavbanktjenester:')) == 'Kostnadervedbrukavbanktjenester:')
+                    ) {
+                        $next_is_fee = true;
+                    }
 					
 					// ?: "Overført frå forrige side"?
 					elseif(preg_match('/Overf.rtfr.forrigeside/', implode($value))) {
@@ -660,6 +665,22 @@ class sparebank1_statementparser_core
                             $key_amount = count($value) - 1;
                         }
                         else {
+                            // If last column is not a date (e.g. 2401). Might be one or two columns with ref.
+                            // Examples:
+                            // - 170000000 * 17000000
+                            // -             17000000
+                            // - 170000000   17000000
+                            if ($is_bank_account_statement_with_reference_numbers && strlen($value[count($value) - 1]) != 4) {
+                                unset($value[count($value) - 1]);
+                                if ($value[count($value) - 1] == '*') {
+                                    // -> Remove *
+                                    unset($value[count($value) - 1]);
+                                }
+                                if (strlen($value[count($value) - 1]) != 4) {
+                                    // -> Second column of ref
+                                    unset($value[count($value) - 1]);
+                                }
+                            }
                             $key_payment_date = count($value) - 1;
                             $key_amount = count($value) - 2;
                             $key_interest_date = count($value) - 3;
@@ -679,17 +700,28 @@ class sparebank1_statementparser_core
 						unset($value[$key_amount]);
 						
 						$amount = sb1helper::stringKroner_to_intOerer($amount);
-						$pos_amount  = $table_width[$key][$key_amount];
-						/*
-							Observed values for $pos_amount:
-							486.7, 3 digits positive
-							474.2, 4 digits positive
-							416.9, 2 digits positive
-							421.9, 2 digits negative
-							411.8, 3 digits negative
-							404.4, 4 digits negative
-						 */
-						if($pos_amount < 422) {
+                        $pos_amount = $table_width[$key][$key_amount];
+                        /*
+                            Observed values for $pos_amount - without reference number:
+                            486.7, 3 digits positive
+                            474.2, 4 digits positive
+                            416.9, 2 digits positive
+
+                            421.9, 2 digits negative
+                            411.8, 3 digits negative
+                            404.4, 4 digits negative
+
+                            Observed values for $pos_amount - with reference number:
+                            359.3, 5 digits positive  (in  12 345,00)
+                            364.3, 4 digits positive  (in   1 234,00)
+
+                            311.8, 1 digits negative  (out      1,00)
+                            294.2, 4 digits negative  (out  1 234,00)
+                         */
+						if(
+                            (!$is_bank_account_statement_with_reference_numbers && $pos_amount < 422)
+                            || ($is_bank_account_statement_with_reference_numbers && $pos_amount < 312)
+                        ) {
 							$amount = -$amount;
 						}
 				
@@ -721,6 +753,9 @@ class sparebank1_statementparser_core
 			
 			elseif (substr(implode($td),0,strlen('ForklaringRentedatoUtavkontoInn')) == 'ForklaringRentedatoUtavkontoInn') {
 				$next_is_transactions        = true;
+                if ($td[count($td) - 1] == 'Referanse') {
+                    $is_bank_account_statement_with_reference_numbers = true;
+                }
 			}
 			
 			elseif (preg_match('/Dato[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9][0-9][0-9]Sidenr/', implode($td))) {
