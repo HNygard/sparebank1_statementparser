@@ -2,7 +2,7 @@
 
 class sparebank1_statementparser_core
 {
-	protected $accounts = array();
+	protected $accounts;
 	protected $transactions = array();
 	protected $transactions_new = 0;
 	protected $transactions_not_imported = 0;
@@ -28,8 +28,7 @@ class sparebank1_statementparser_core
 		// Creator "M2PD API Version 3.0, build(some date)" should work. Used up to jan 2008.
 		
 		pdf2textwrapper::pdf2text_fromstring($infile); // Returns the text, but we are using the table
-		
-		$this->accounts = array(); // Can be multiple accounts per file
+
 		if(
 			pdf2textwrapper::$pdf_author == 'Registered to: EDB DRFT' &&
 			(
@@ -39,7 +38,7 @@ class sparebank1_statementparser_core
 			) 
 		){
 			// Parse and read Exstream PDF
-			$this->parseAndReadExstreamPdf($infile);
+			$this->accounts = self::parseAndReadExstreamPdf($this->accountsTranslation);
 		}
 		elseif (
 			(
@@ -50,7 +49,7 @@ class sparebank1_statementparser_core
 			substr(pdf2textwrapper::$pdf_creator, 0, strlen('M2PD API Version 3.0, build')) == 'M2PD API Version 3.0, build'
 		) {
 			// Parse and read "M2PD API Version 3.0" (used up to jan 2008)
-			$this->parseAndReadJan2008Pdf($infile);
+			$this->accounts = self::parseAndReadJan2008Pdf($this->accountsTranslation);
 		}
 		else {
 			throw new Exception('Unknown/unsupported PDF creator.'.
@@ -96,18 +95,9 @@ class sparebank1_statementparser_core
 	 * Author = "Registered to: EDB DRFT"
 	 * Creator = "Exstream Dialogue Version 5.0.051" OR "HP Exstream Version 7.0.605"
 	 */
-	private function parseAndReadExstreamPdf($infile) {
+	public static function parseAndReadExstreamPdf($accountTranslations) {
 
 		if(!count(pdf2textwrapper::$table)) {
-			/*
-			// Add:
-			//    if(self::$debugging) { echo '<pre>'.$data.'</pre>'; }
-			// or something in pdf2textwrapper to debug the current PDF (a failed PDF)
-			pdf2textwrapper::$debugging = true;
-			pdf2textwrapper::pdf2text_fromstring($infile);
-			pdf2textwrapper::$debugging = false;
-			/**/
-
 			throw new Exception('PDF parser failed. Unable to read any lines from post jan 2008 PDF.');
 		}
 		
@@ -115,7 +105,8 @@ class sparebank1_statementparser_core
 		$next_is_balance_out  = false;
 		$next_is_fee          = false;
 		$next_is_transactions = false;
-		
+
+        $accounts = array();
 		$last_account = null;
 		$the_table = pdf2textwrapper::$table;
 		foreach($the_table as $td_id => $td)
@@ -183,17 +174,17 @@ class sparebank1_statementparser_core
 					$account_type            = $parts[1]; // Alltid Pluss 18-34
 					
 					$last_account = $account_num.'_'.$accountstatement_start;
-					if(isset($this->accountsTranslation[$account_num])) {
-						$last_account_id = $this->accountsTranslation[$account_num];
+					if(isset($accountTranslations[$account_num])) {
+						$last_account_id = $accountTranslations[$account_num];
 					}
 					else {
 						$last_account_id = -1;
 					}
 					
 					// If account spans over several pages, the heading repeats
-					if(!isset($this->accounts[$last_account]))
+					if(!isset($accounts[$last_account]))
 					{
-						$this->accounts[$last_account] = array(
+                        $accounts[$last_account] = array(
 							'accountstatement_num'    => $accountstatement_num,
 							'account_id'              => $last_account_id,
 							'account_num'             => $account_num,
@@ -203,7 +194,6 @@ class sparebank1_statementparser_core
 							'transactions'            => array(),
 							'control_amount'          => 0,
 						);
-						//echo '<tr><td>Account: <b>'.$account_num.'</b></td></tr>';
 					}
 					
 					$next_is_fee = false;
@@ -252,17 +242,17 @@ class sparebank1_statementparser_core
 				}
 
 				self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime
-					($td[1], date('Y', $this->accounts[$last_account]['accountstatement_end']));
+					($td[1], date('Y', $accounts[$last_account]['accountstatement_end']));
 				self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime 
-					($td[3], date('Y', $this->accounts[$last_account]['accountstatement_end']));
+					($td[3], date('Y', $accounts[$last_account]['accountstatement_end']));
 				
 				self::$lasttransactions_description  = $td[0];
 				self::$lasttransactions_type         = '';
 				
 				self::parseLastDescription($next_is_fee);
-				
-				$this->accounts[$last_account]['control_amount'] += $amount;
-				$this->accounts[$last_account]['transactions'][] = array(
+
+                $accounts[$last_account]['control_amount'] += $amount;
+                $accounts[$last_account]['transactions'][] = array(
 						'bankaccount_id'  => $last_account_id,
 						'description'     => self::$lasttransactions_description,
 						'interest_date'   => self::$lasttransactions_interest_date,
@@ -270,25 +260,6 @@ class sparebank1_statementparser_core
 						'payment_date'    => self::$lasttransactions_payment_date,
 						'type'            => self::$lasttransactions_type,
 					);
-				/*
-				echo '<tr>';
-				echo '<td>'.self::$lasttransactions_description.'</td>';
-				echo '<td>'.date('d.m.Y', self::$lasttransactions_interest_date).'</td>';
-				if($amount > 0)
-					echo '<td>&nbsp;</td><td>'.($amount/100).'</td>';
-				else
-					echo '<td>'.($amount/100).'</td><td>&nbsp;</td>';
-				echo '<td>'.date('d.m.Y', self::$lasttransactions_payment_date).'</td>';
-				
-				echo '</tr>';/**/
-				/*
-				$this->transactions[] = array(
-						'bankaccount_id' => $this->bankaccount_id,
-						'payment_date'   => utf8::clean($csv[0]),
-						'interest_date'  => utf8::clean($csv[2]),
-						'description'    => utf8_encode($csv[1]),
-						'amount'         => str_replace(',', '.', utf8::clean($csv[3])),
-					);*/
 			}
 			
 			/*
@@ -358,8 +329,8 @@ class sparebank1_statementparser_core
 				) {
 					$balance_in = -$balance_in;
 				}
-				$this->accounts[$last_account]['accountstatement_balance_in'] = $balance_in;
-				$this->accounts[$last_account]['control_amount'] += $this->accounts[$last_account]['accountstatement_balance_in'];
+                $accounts[$last_account]['accountstatement_balance_in'] = $balance_in;
+                $accounts[$last_account]['control_amount'] += $accounts[$last_account]['accountstatement_balance_in'];
 				$next_is_balance_in = false;
 			}
 			
@@ -425,7 +396,7 @@ class sparebank1_statementparser_core
 					// -> Negative balance
 					$balance_out = -$balance_out;
 				}
-				$this->accounts[$last_account]['accountstatement_balance_out'] = $balance_out;
+                $accounts[$last_account]['accountstatement_balance_out'] = $balance_out;
 				$next_is_balance_out = false;
 			}
 			elseif(
@@ -436,37 +407,12 @@ class sparebank1_statementparser_core
 				// The next detected transactions, if any, is fees
 				$next_is_fee = true;
 			}
-			
-			
-			/*
-			elseif($last_account && $this->accounts[$last_account]['accountstatement_num'] == '9')
-			{
-				// Debugging
-				echo '<tr><td colspan="4">'.print_r($td, true).'</td></tr>';
-			}
-			/**/
-			/*
-			else
-			{
-				// Debugging
-				echo '<tr><td colspan="4">'.implode('', $td).'</td></tr>';
-			}
-			/**/
 		}
+        return $accounts;
 	}
 	
-	private function parseAndReadJan2008Pdf($infile) {
-
+	public static function parseAndReadJan2008Pdf($accountTranslations) {
 		if(!count(pdf2textwrapper::$table)) {
-			/*
-			// Add:
-			//    if(self::$debugging) { echo '<pre>'.$data.'</pre>'; }
-			// or something in pdf2textwrapper to debug the current PDF (a failed PDF)
-			pdf2textwrapper::$debugging = true;
-			pdf2textwrapper::pdf2text_fromstring($infile);
-			pdf2textwrapper::$debugging = false;
-			/**/
-
 			throw new Exception('PDF parser failed. Unable to read any lines from pre jan 2008 pdf.');
 		}
 		
@@ -479,6 +425,7 @@ class sparebank1_statementparser_core
 		
 		$last_account = null;
 
+        $accounts = array();
 		$table = array(); $table_width = array();
 		$last_height = -1;
         $is_bank_account_statement_with_reference_numbers = false;
@@ -567,17 +514,17 @@ class sparebank1_statementparser_core
                 $account_type            = $parts[1]; // Alltid Pluss 18-34
 
                 $last_account = $account_num.'_'.$accountstatement_start;
-                if(isset($this->accountsTranslation[$account_num])) {
-                    $last_account_id = $this->accountsTranslation[$account_num];
+                if(isset($accountTranslations[$account_num])) {
+                    $last_account_id = $accountTranslations[$account_num];
                 }
                 else {
                     $last_account_id = -1;
                 }
 
                 // If account spans over several pages, the heading repeats
-                if(!isset($this->accounts[$last_account]))
+                if(!isset($accounts[$last_account]))
                 {
-                    $this->accounts[$last_account] = array(
+                    $accounts[$last_account] = array(
                         'accountstatement_num'    => $accountstatement_num,
                         'account_id'              => $last_account_id,
                         'account_num'             => $account_num,
@@ -627,7 +574,7 @@ class sparebank1_statementparser_core
 					// -> Negative balance
 					$balance_out = -$balance_out;
 				}
-				$this->accounts[$last_account]['accountstatement_balance_out'] = $balance_out;
+                $accounts[$last_account]['accountstatement_balance_out'] = $balance_out;
 
 				// :: Parse the transations we have collected
 				//
@@ -658,7 +605,6 @@ class sparebank1_statementparser_core
 					
 					else {
 						// -> Transactions
-
                         $is_balance_from_last_month = substr(implode($value),0,strlen('Saldofr')) == 'Saldofr';
 
                         if ($is_balance_from_last_month) {
@@ -681,6 +627,7 @@ class sparebank1_statementparser_core
                                     unset($value[count($value) - 1]);
                                 }
                             }
+
                             $key_payment_date = count($value) - 1;
                             $key_amount = count($value) - 2;
                             $key_interest_date = count($value) - 3;
@@ -690,9 +637,9 @@ class sparebank1_statementparser_core
                             unset($value[$key_interest_date]);
 
                             self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime
-                            ($interest_date, date('Y', $this->accounts[$last_account]['accountstatement_end']));
+                            ($interest_date, date('Y', $accounts[$last_account]['accountstatement_end']));
                             self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime
-                            ($payment_date, date('Y', $this->accounts[$last_account]['accountstatement_end']));
+                            ($payment_date, date('Y', $accounts[$last_account]['accountstatement_end']));
                         }
 
 						$amount         = $value[$key_amount];
@@ -729,17 +676,17 @@ class sparebank1_statementparser_core
 						self::$lasttransactions_type         = '';
 
                         if($is_balance_from_last_month) {
-                            $this->accounts[$last_account]['accountstatement_balance_in'] = $amount;
-                            $this->accounts[$last_account]['control_amount']
-                                += $this->accounts[$last_account]['accountstatement_balance_in'];
+                            $accounts[$last_account]['accountstatement_balance_in'] = $amount;
+                            $accounts[$last_account]['control_amount']
+                                += $accounts[$last_account]['accountstatement_balance_in'];
                             continue;
                         }
 
 				
 						self::parseLastDescription($next_is_fee);
-				
-						$this->accounts[$last_account]['control_amount'] += $amount;
-						$this->accounts[$last_account]['transactions'][] = array(
+
+                        $accounts[$last_account]['control_amount'] += $amount;
+                        $accounts[$last_account]['transactions'][] = array(
 								'bankaccount_id'  => $last_account_id,
 								'description'     => mb_convert_encoding(self::$lasttransactions_description, 'UTF-8', 'Windows-1252'),
 								'interest_date'   => self::$lasttransactions_interest_date,
@@ -801,6 +748,7 @@ class sparebank1_statementparser_core
 				}
 			}
 		}
+        return $accounts;
 	}
 	
 	static function parseLastDescription ($is_fee) {
@@ -892,7 +840,7 @@ class sparebank1_statementparser_core
 	}
 	
 	/**
-	 * Returns array with accounts found in the file
+	 * Returns array with accounts found in the file. Can be multiple accounts per file.
 	 *
 	 * @return  array
 	 */
