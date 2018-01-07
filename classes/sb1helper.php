@@ -60,7 +60,7 @@ class sb1helper
 		{
 			return mktime (0, 0, 0, substr($date, 2, 2), substr($date, 0, 2), $year);
 		}
-		throw new Kohana_Exception ('Unknown date format: :date', array(':date' => $date));
+		throw new Exception ('Unknown date format: ' . $date);
 	}
 	
 	/**
