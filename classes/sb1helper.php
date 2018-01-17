@@ -39,9 +39,10 @@ class sb1helper
 	/**
 	 * Convert a string with date to unix time
 	 *
-	 * @param   string   Date, format: 3112 or 31.12.2011
-	 * @param   integer  Year, optional. Needed if format is 3112
+	 * @param   string   $date   Date, format: 3112 or 31.12.2011
+	 * @param   integer  $year   Year, optional. Needed if format is 3112
 	 * @return  integer  Unix time
+     * @throws Exception thrown if we can't find an exact date.
 	 */
 	static function convert_stringDate_to_intUnixtime ($date, $year = null)
 	{

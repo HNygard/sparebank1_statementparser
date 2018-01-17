@@ -81,11 +81,9 @@ class sparebank1_statementparser_exstream_pdf extends sparebank1_statementparser
                 if (count($parts) == 5) {
                     $accountstatement_num = $parts[1]; // 2
                     $account_num = $parts[2]; // 1234.12.12345
-                    $accountstatement_start = sb1helper::convert_stringDate_to_intUnixtime
-                    ($parts[3]); // 01.02.2011
+                    $accountstatement_start = sb1helper::convert_stringDate_to_intUnixtime($parts[3]); // 01.02.2011
                     $parts = explode(' ', $parts[4], 2); // 28.02.2011 Alltid Pluss 18-34
-                    $accountstatement_end = sb1helper::convert_stringDate_to_intUnixtime
-                    ($parts[0]); // 28.02.2011
+                    $accountstatement_end = sb1helper::convert_stringDate_to_intUnixtime($parts[0]); // 28.02.2011
                     $account_type = $parts[1]; // Alltid Pluss 18-34
 
                     $last_account = $account_num . '_' . $accountstatement_start;
@@ -95,6 +93,9 @@ class sparebank1_statementparser_exstream_pdf extends sparebank1_statementparser
                     else {
                         $last_account_id = -1;
                     }
+
+                    self::$lasttransactions_interest_date = null;
+                    self::$lasttransactions_payment_date = null;
 
                     // If account spans over several pages, the heading repeats
                     if (!isset($accounts[$last_account])) {
@@ -152,10 +153,45 @@ class sparebank1_statementparser_exstream_pdf extends sparebank1_statementparser
                     $amount = -$amount;
                 }
 
-                self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime
-                ($td[1], date('Y', $accounts[$last_account]['accountstatement_end']));
-                self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime
-                ($td[3], date('Y', $accounts[$last_account]['accountstatement_end']));
+                $interestDateYear = date('Y', $accounts[$last_account]['accountstatement_end']);
+                $paymentDateYear = $interestDateYear;
+                $interestDate4Digits = $td[1];
+                $paymentDate4Digits = $td[3];
+                if (date('dm', $accounts[$last_account]['accountstatement_start']) == '0101') {
+                    // -> This account statement is at the start of the year
+                    if ($interestDate4Digits == '3112' || $interestDate4Digits == '3012' || $interestDate4Digits == '2912') {
+                        // -> Maybe last years transaction
+                        if (self::$lasttransactions_interest_date == null) {
+                            // -> This is the first transaction this year.
+                            $interestDateYear = $interestDateYear - 1;
+                        }
+                        else {
+                            if (self::$lasttransactions_interest_date != null
+                                && date('Y', self::$lasttransactions_interest_date) != $interestDateYear
+                            ) {
+                                // -> Last transaction must be a transaction from last year. This one is likely the same year.
+                                $interestDateYear = $interestDateYear - 1;
+                            }
+                        }
+                    }
+                    if ($paymentDate4Digits == '3112' || $paymentDate4Digits == '3012' || $paymentDate4Digits == '2912') {
+                        // -> Maybe last years transaction
+                        if (self::$lasttransactions_payment_date == null) {
+                            // -> This is the first transaction this year.
+                            $paymentDateYear = $paymentDateYear - 1;
+                        }
+                        else {
+                            if (self::$lasttransactions_payment_date != null
+                                && date('Y', self::$lasttransactions_payment_date) != $paymentDateYear
+                            ) {
+                                // -> Last transaction must be a transaction from last year. This one is likely the same year.
+                                $paymentDateYear = $paymentDateYear - 1;
+                            }
+                        }
+                    }
+                }
+                self::$lasttransactions_interest_date = sb1helper::convert_stringDate_to_intUnixtime($interestDate4Digits, $interestDateYear);
+                self::$lasttransactions_payment_date = sb1helper::convert_stringDate_to_intUnixtime($paymentDate4Digits, $paymentDateYear);
 
                 self::$lasttransactions_description = $td[0];
                 self::$lasttransactions_type = '';

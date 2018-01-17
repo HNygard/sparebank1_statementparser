@@ -3,8 +3,8 @@
 class sparebank1_statementparser_common {
     protected static $lasttransactions_description;
     protected static $lasttransactions_type;
-    protected static $lasttransactions_interest_date;
-    protected static $lasttransactions_payment_date;
+    protected static $lasttransactions_interest_date = null;
+    protected static $lasttransactions_payment_date = null;
 
     static function parseLastDescription($is_fee) {
 

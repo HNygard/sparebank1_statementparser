@@ -90,11 +90,9 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
 
                 $accountstatement_num = $parts[1]; // 2
                 $account_num = $parts[2]; // 1234.12.12345
-                $accountstatement_start = sb1helper::convert_stringDate_to_intUnixtime
-                ($parts[3]); // 01.02.2011
+                $accountstatement_start = sb1helper::convert_stringDate_to_intUnixtime($parts[3]); // 01.02.2011
                 $parts = explode(' ', $parts[4], 2); // 28.02.2011 Alltid Pluss 18-34
-                $accountstatement_end = sb1helper::convert_stringDate_to_intUnixtime
-                ($parts[0]); // 28.02.2011
+                $accountstatement_end = sb1helper::convert_stringDate_to_intUnixtime($parts[0]); // 28.02.2011
                 $account_type = $parts[1]; // Alltid Pluss 18-34
 
                 $last_account = $account_num . '_' . $accountstatement_start;
