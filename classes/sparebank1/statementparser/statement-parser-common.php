@@ -23,27 +23,35 @@ class sparebank1_statementparser_common {
         // Overføring => Overførsel
         $pdf_transaction_type_search['Overføring '] = 'OVERFØRSEL';
         // Overførsel => OVERFØRSEL
-        //$pdf_transaction_type_search['Overførsel '] = 'OVERFØRSEL';
+        $pdf_transaction_type_search['Overførsel '] = 'OVERFØRSEL';
         // Valuta => VALUTA
         $pdf_transaction_type_search['Valuta '] = 'VALUTA';
         // Nettbank til: => NETTBANK TIL
         $pdf_transaction_type_search['Nettbank til:'] = 'NETTBANK TIL';
         // Nettbank til: => NETTBANK FRA
         $pdf_transaction_type_search['Nettbank fra:'] = 'NETTBANK FRA';
+        // Giro Fra: => GIRO FRA
+        $pdf_transaction_type_search['Giro Fra:'] = 'GIRO FRA';
         // Nettgiro til: => NETTGIRO TIL
         $pdf_transaction_type_search['Nettgiro til:'] = 'NETTGIRO TIL';
         // Nettgiro Til: => NETTGIRO TIL
-        //$pdf_transaction_type_search['Nettgiro Til:'] = 'NETTGIRO TIL';
+        $pdf_transaction_type_search['Nettgiro Til:'] = 'NETTGIRO TIL';
         // Nettgiro fra: => NETTGIRO FRA
         $pdf_transaction_type_search['Nettgiro fra:'] = 'NETTGIRO FRA';
+        // Nettgiro Fra: => NETTGIRO FRA
+        $pdf_transaction_type_search['Nettgiro Fra:'] = 'NETTGIRO FRA';
         // Telegiro fra: => TELEGIRO FRA
         $pdf_transaction_type_search['Telegiro fra:'] = 'TELEGIRO FRA';
+        // Telegiro Til: => TELEGIRO TIL
+        $pdf_transaction_type_search['Telegiro Til:'] = 'TELEGIRO TIL';
         // Mobilbank fra: => MOBILBANK FRA
-        //$pdf_transaction_type_search['Mobilbank fra:'] = 'MOBILBANK FRA';
+        $pdf_transaction_type_search['Mobilbank fra: '] = 'MOBILBANK FRA';
         // Innskudd Fra: => INNSKUDD FRA
-        //$pdf_transaction_type_search['Innskudd Fra:'] = 'INNSKUDD FRA';
+        $pdf_transaction_type_search['Innskudd Fra:'] = 'INNSKUDD';
+        // Innskudd => INNSKUDD
+        $pdf_transaction_type_search['Innskudd '] = 'INNSKUDD';
         // Bedrterm overf. Fra: => BEDRTERM OVERFØRSEL
-        //$pdf_transaction_type_search['Bedrterm overf. Fra:'] = 'BEDRTERM OVERFØRSEL';
+        $pdf_transaction_type_search['Bedrterm overf. Fra:'] = 'BEDRTERM OVERFØRSEL';
         foreach ($pdf_transaction_type_search as $search => $transaction_type) {
             self::$lasttransactions_description = self::remove_firstpart_if_found_and_set_type_pdf(
                 self::$lasttransactions_description,
@@ -105,7 +113,7 @@ class sparebank1_statementparser_common {
 
     static function remove_firstpart_if_found_and_set_type_pdf($description, $search, $type_if_matched) {
         if (substr($description, 0, strlen($search)) == $search) {
-            $description = substr($description, strlen($search));
+            $description = trim(substr($description, strlen($search)));
             self::$lasttransactions_type = $type_if_matched;
         }
         return $description;
