@@ -263,8 +263,9 @@ class pdf2textwrapper
 				str_replace('\\323', 'ø',
 				str_replace('\\330', 'Ø',
 				str_replace('\\304', 'Ä',
+				str_replace('\\351', 'é',
 					$strip
-				)))))))))));
+				))))))))))));
 		}
 	}
 	static function getCharTransformations(&$transformations, $stream) {
