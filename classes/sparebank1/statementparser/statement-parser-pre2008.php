@@ -262,13 +262,13 @@ class sparebank1_statementparser_pre2008 extends sparebank1_statementparser_comm
                             continue;
                         }
 
-
+                        self::$lasttransactions_description = mb_convert_encoding(self::$lasttransactions_description, 'UTF-8', 'Windows-1252');
                         self::parseLastDescription($next_is_fee);
 
                         $accounts[$last_account]['control_amount'] += $amount;
                         $accounts[$last_account]['transactions'][] = array(
                             'bankaccount_id' => $last_account_id,
-                            'description' => mb_convert_encoding(self::$lasttransactions_description, 'UTF-8', 'Windows-1252'),
+                            'description' => self::$lasttransactions_description,
                             'interest_date' => self::$lasttransactions_interest_date,
                             'amount' => ($amount / 100),
                             'payment_date' => self::$lasttransactions_payment_date,
