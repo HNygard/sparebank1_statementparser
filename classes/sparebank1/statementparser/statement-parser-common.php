@@ -49,7 +49,7 @@ class sparebank1_statementparser_common {
         // Innskudd Fra: => INNSKUDD FRA
         $pdf_transaction_type_search['Innskudd Fra:'] = 'INNSKUDD';
         // Innskudd => INNSKUDD
-        $pdf_transaction_type_search['Innskudd '] = 'INNSKUDD';
+        $pdf_transaction_type_search['Innskudd automat'] = 'INNSKUDD';
         // Bedrterm overf. Fra: => BEDRTERM OVERFØRSEL
         $pdf_transaction_type_search['Bedrterm overf. Fra:'] = 'BEDRTERM OVERFØRSEL';
         foreach ($pdf_transaction_type_search as $search => $transaction_type) {
