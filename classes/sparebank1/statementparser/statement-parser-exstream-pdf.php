@@ -198,8 +198,18 @@ class sparebank1_statementparser_exstream_pdf extends sparebank1_statementparser
 
                 self::parseLastDescription($next_is_fee);
 
+                $reference_number = null;
+                if (count($td) == 5) {
+                    // -> Account with one column reference number. E.g. 1234567
+                    $reference_number = trim($td[4]);
+                }
+                elseif (count($td) == 6) {
+                    // -> Account with two column reference number. E.g. 1234 1234567
+                    $reference_number = trim($td[4]) . ' ' . trim($td[5]);
+                }
+
                 $accounts[$last_account]['control_amount'] += $amount;
-                $accounts[$last_account]['transactions'][] = array(
+                $transaction = array(
                     'bankaccount_id' => $last_account_id,
                     'description' => self::$lasttransactions_description,
                     'interest_date' => self::$lasttransactions_interest_date,
@@ -207,6 +217,10 @@ class sparebank1_statementparser_exstream_pdf extends sparebank1_statementparser
                     'payment_date' => self::$lasttransactions_payment_date,
                     'type' => self::$lasttransactions_type,
                 );
+                if ($reference_number != null) {
+                    $transaction['reference_number'] = $reference_number;
+                }
+                $accounts[$last_account]['transactions'][] = $transaction;
             }
 
             /*
