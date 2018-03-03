@@ -79,4 +79,9 @@ class Sparebank1AccountStatementTransaction {
      * @var String If payment type was detected. E.g. "NETTGIRO FRA", "NETTGIRO TIL", "LØNN", etc
      */
     public $type;
+
+    /**
+     * @var String Contains a reference number, if the statement contained one. E.g. 1234 1234567, 1234 *1234567 or 123456 or something.
+     */
+    public $reference_number;
 }
