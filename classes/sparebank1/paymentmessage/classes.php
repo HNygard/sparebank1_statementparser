@@ -52,3 +52,6 @@ class Sparebank1PriceChangeDocument extends Sparebank1Document {
 class Sparebank1YearlyStatementDocument extends Sparebank1Document {
 	public $content;
 }
+class Sparebank1LoanPaymentDocument extends Sparebank1Document {
+	public $content;
+}

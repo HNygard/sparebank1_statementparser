@@ -551,6 +551,23 @@ class sparebank1_paymentmessage_core
 			$this->currentDocument->content = implode(chr(10), $content);
 			$another_detect_new_document = true;
 		}
+		else if ($lines[$i][0] === 'BELASTNINGSOPPGÅVE') {
+			echo '=> Loan payment document detected.'.chr(10);
+			$this->currentDocument = new Sparebank1LoanPaymentDocument();
+			// :: Collect all the lines in this document
+			$content = array();
+			for(;$i < count($lines); $i++) {
+				$content[] = implode(' ', $lines[$i]);
+				if($lines[$i][0] === 'Neste forfallsdato: ') {
+					// -> This is the last line in the document.
+					$i++;
+					break;
+				}
+			}
+			echo 'Content: '.chr(10) . '    '.implode(chr(10) . '    ', $content).chr(10);
+			$this->currentDocument->content = implode(chr(10), $content);
+			$another_detect_new_document = true;
+		}
 		else if($lines[$i][0] === 'Endringer i prislisten') {
 			echo '=> Price change document detected.'.chr(10);
 			$this->currentDocument = new Sparebank1PriceChangeDocument();
