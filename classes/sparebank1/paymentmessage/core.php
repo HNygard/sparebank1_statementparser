@@ -278,11 +278,20 @@ class sparebank1_paymentmessage_core
 			}
 
 			// :: Payment message
-			if (isset($lines[$i]) && $lines[$i][0] === 'Beløpet gjelder:') {
-				// I've seen 1 to 3 lines here. So let's look for date + amount in the two next fields
-				assertLineEquals($i++, 0, $lines, 'Beløpet gjelder:');
+			if (isset($lines[$i]) && ($lines[$i][0] === 'Beløpet gjelder:' || $lines[$i][0] === 'Fortsetter på neste side' || strpos($lines[$i][0], 'Innbetalingsoversikt for konto:') !== false)) {
+				$search_for_belopet_gjelder = $lines[$i][0] === 'Beløpet gjelder:';
+				if ($search_for_belopet_gjelder) {
+					// I've seen 1 to 3 lines here. So let's look for date + amount in the two next fields
+					assertLineEquals($i++, 0, $lines, 'Beløpet gjelder:');
+				}
+				elseif($lines[$i][0] === 'Fortsetter på neste side') {
+					// -> Last item om page did not contain "Beløpet gjelder"
+					assertLineEquals($i++, 0, $lines, 'Fortsetter på neste side');
+				}
 				while (true) {
-					$payment_message[] = $lines[$i++][0];
+					if ($search_for_belopet_gjelder && strpos($lines[$i][0], 'Innbetalingsoversikt for konto:') === false) {
+						$payment_message[] = $lines[$i++][0];
+					}
 					if (!isset($lines[$i])) {
 						// -> End of file
 						$end_of_file = true;
@@ -334,18 +343,52 @@ class sparebank1_paymentmessage_core
 								'does not match document date on the next page ['. $new_page_date .'].');
 						}
 						$this->currentDocument->page_number = $new_page_number;
-	
+
 						$new_page_customer_name = $lines[$i][0];
-						$lines[$i][1] = str_replace('epost :', 'epost:', strtolower($lines[$i][1]));
-						assertLineEquals($i, 1, $lines, ', epost:');
-						$new_page_customer_email = substr($lines[$i++][2], strlen(', '));
 						if($new_page_customer_name !== $this->currentDocument->customer_name) {
 							throw new Exception('Current customer name [' . $this->currentDocument->customer_name .'] '.
 								'does not match customer name on the next page ['. $new_page_customer_name .'].');
 						}
+						if (strpos($lines[$i][1], 'epost') !== false) {
+							$lines[$i][1] = str_replace('epost :', 'epost:', strtolower($lines[$i][1]));
+							assertLineEquals($i, 1, $lines, ', epost:');
+							$new_page_customer_email = substr($lines[$i++][2], strlen(', '));
+						}
+						else {
+							// -> Not email. Ignoring.
+							$new_page_customer_email = null;
+							$i++;
+						}
 						if($new_page_customer_email !== $this->currentDocument->customer_email) {
 							throw new Exception('Current customer email [' . $this->currentDocument->customer_email .'] '.
 								'does not match customer email on the next page ['. $new_page_customer_email .'].');
+						}
+						if (!isDate($lines[$i][0])) {
+							$payment_message[] = $lines[$i++][0];
+						}
+						if (!isDate($lines[$i][0])) {
+							$payment_message[] = $lines[$i++][0];
+						}
+						if (!isDate($lines[$i][0])) {
+							$payment_message[] = $lines[$i++][0];
+						}
+						if (!isDate($lines[$i][0])) {
+							$payment_message[] = $lines[$i++][0];
+						}
+						if (!isDate($lines[$i][0])) {
+							$payment_message[] = $lines[$i++][0];
+						}
+						if (!isDate($lines[$i][0])) {
+							$payment_message[] = $lines[$i++][0];
+						}
+						if (!isDate($lines[$i][0])) {
+							$payment_message[] = $lines[$i++][0];
+						}
+						if (!isDate($lines[$i][0])) {
+							$payment_message[] = $lines[$i++][0];
+						}
+						if (!isDate($lines[$i][0])) {
+							$payment_message[] = $lines[$i++][0];
 						}
 						break;
 					}
@@ -360,8 +403,9 @@ class sparebank1_paymentmessage_core
 			}
 			echo 'Payment message: '.chr(10) . '    '.implode(chr(10) . '    ', $payment_message).chr(10);
 			$paymentMessage->payment_message = implode(chr(10), $payment_message);
-			if(count($payment_message) > 3) {
-				throw new Exception('Found more than 3 lines in payment message. Something might be wrong.');
+			if(count($payment_message) > 4) {
+				var_dump($payment_message);
+				throw new Exception('Found more than 4 lines in payment message. Something might be wrong.');
 			}
 		}
 
@@ -430,12 +474,19 @@ class sparebank1_paymentmessage_core
 		$customer_id = $lines[$i++][0];
 		// Next up should be the name and address this was sent to. In my case name and email.
 		$customer_name = $lines[$i][0];
-		$lines[$i][1] = str_replace(' :', ':', strtolower($lines[$i][1]));
-		assertLineEquals($i, 1, $lines, 'epost:'); // I guess this is not the case for documents sent in snail mail
-		if (filter_var($lines[$i][2], FILTER_VALIDATE_EMAIL) === false) {
-			throwException('was not an email. It was ['.$lines[$i][2].']', $i, 2, $lines);
+		if (strpos($lines[$i][1], 'epost') !== false) {
+			$lines[$i][1] = str_replace(' :', ':', strtolower($lines[$i][1]));
+			assertLineEquals($i, 1, $lines, 'epost:'); // I guess this is not the case for documents sent in snail mail
+			if (filter_var($lines[$i][2], FILTER_VALIDATE_EMAIL) === false) {
+				throwException('was not an email. It was ['.$lines[$i][2].']', $i, 2, $lines);
+			}
+			$customer_email = $lines[$i++][2];
 		}
-		$customer_email = $lines[$i++][2];
+		else {
+			// -> Guessing address, skipping
+			$customer_email = null;
+			$i++;
+		}
 		// I think $lines[$i][3] is a branch code. Don't care.
 		echo 'Customer id ..... : ' . $customer_id . chr(10);
 		echo 'Customer name ... : ' . $customer_name . chr(10);
