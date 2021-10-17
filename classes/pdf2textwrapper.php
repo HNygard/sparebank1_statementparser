@@ -132,14 +132,14 @@ class pdf2textwrapper
 		    $sum += ($ords[$i] + ($i == $state - 1)) * pow(85, 4 - $i);
 		}
 		for ($i = 0; $i < $state - 1; $i++) {
-		    $ouput .= chr($sum >> ((3 - $i) * 8));
+            $output .= chr($sum >> ((3 - $i) * 8));
 		}
 	    }
 
 	    return $output;
 	}
 	static function decodeFlate($input) {
-	    return @gzuncompress($input);
+	    return gzuncompress($input);
 	}
 
 	static function getObjectOptions($object) {
@@ -165,7 +165,6 @@ class pdf2textwrapper
 	    return $options;
 	}
 	static function getDecodedStream($stream, $options) {
-	    $data = "";
 	    if (empty($options["Filter"])) {
 		$data = $stream;
 	    }
@@ -187,7 +186,12 @@ class pdf2textwrapper
 		    if ($key == "FlateDecode" || $key == 'Fl' || $key == 'FlateDecode]') {
 			// Fl & "FlateDecode]" added by Hallvard Nygard
 		        // Added "FlateDecode]" since I don't want to fix the reg ex
-		        $_stream = pdf2textwrapper::decodeFlate($_stream);
+                try {
+                    $_stream = pdf2textwrapper::decodeFlate($_stream);
+                }
+                catch(Exception $e) {
+                    $_stream = 'EXCEPTION during decodeFlate: '. $e->getMessage();
+                }
 		    }
 		}
 		$data = $_stream;
